@@ -1,0 +1,32 @@
+[2026-06-12T04:32:47.214Z] Authentication token is required.
+[2026-06-12T04:32:56.160Z] Expected property name or '}' in JSON at position 1 (line 1 column 2)
+[2026-06-12T04:32:56.662Z] DATABASE_UNAVAILABLE: Database is unavailable. Start MySQL on localhost:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql. | ECONNREFUSED: AggregateError | ECONNREFUSED: connect ECONNREFUSED ::1:3306 | ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:3306
+[2026-06-12T04:33:14.875Z] DATABASE_UNAVAILABLE: Database is unavailable. Start MySQL on localhost:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql. | ECONNREFUSED: AggregateError | ECONNREFUSED: connect ECONNREFUSED ::1:3306 | ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:3306
+[2026-06-12T04:33:47.211Z] Authentication token is required.
+[2026-06-12T04:34:47.202Z] Authentication token is required.
+[2026-06-12T04:34:58.536Z] DATABASE_UNAVAILABLE: Database is unavailable. Start MySQL on localhost:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql. | ECONNREFUSED: AggregateError | ECONNREFUSED: connect ECONNREFUSED ::1:3306 | ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:3306
+[2026-06-12T04:35:00.491Z] DATABASE_UNAVAILABLE: Database is unavailable. Start MySQL on localhost:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql. | ECONNREFUSED: AggregateError | ECONNREFUSED: connect ECONNREFUSED ::1:3306 | ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:3306
+[2026-06-12T04:35:47.216Z] Authentication token is required.
+[2026-06-12T04:36:02.143Z] DATABASE_UNAVAILABLE: Database is unavailable. Start MySQL on localhost:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql. | ECONNREFUSED: AggregateError | ECONNREFUSED: connect ECONNREFUSED ::1:3306 | ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:3306
+[2026-06-12T04:36:03.203Z] DATABASE_UNAVAILABLE: Database is unavailable. Start MySQL on localhost:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql. | ECONNREFUSED: AggregateError | ECONNREFUSED: connect ECONNREFUSED ::1:3306 | ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:3306
+[2026-06-12T04:36:04.635Z] DATABASE_UNAVAILABLE: Database is unavailable. Start MySQL on localhost:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql. | ECONNREFUSED: AggregateError | ECONNREFUSED: connect ECONNREFUSED ::1:3306 | ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:3306
+[2026-06-12T04:36:47.206Z] Authentication token is required.
+[2026-06-12T04:37:47.220Z] Authentication token is required.
+[2026-06-12T04:38:47.213Z] Authentication token is required.
+[2026-06-12T04:39:47.227Z] Authentication token is required.
+[2026-06-12T04:40:47.218Z] Authentication token is required.
+[2026-06-12T04:40:59.427Z] DATABASE_UNAVAILABLE: Database is unavailable. Start MySQL on localhost:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql. | ECONNREFUSED: AggregateError | ECONNREFUSED: connect ECONNREFUSED ::1:3306 | ECONNREFUSED: connect ECONNREFUSED 127.0.0.1:3306
+[2026-06-12T04:41:47.199Z] Authentication token is required.
+[2026-06-12T04:42:47.208Z] Authentication token is required.
+[2026-06-12T04:43:21.198Z] Authentication token is required.
+[2026-06-12T04:43:21.208Z] Authentication token is required.
+[2026-06-12T04:43:23.070Z] Authentication token is required.
+[2026-06-12T04:43:23.077Z] Route not found: /api/customers?limit=100
+[2026-06-12T04:43:23.080Z] Authentication token is required.
+[2026-06-12T04:43:23.083Z] Route not found: /api/customers?limit=100
+[2026-06-12T04:43:23.087Z] Route not found: /api/customers?limit=100
+[2026-06-12T04:43:24.707Z] Route not found: /api/shipments
+[2026-06-12T04:43:24.712Z] Route not found: /api/shipments
+[2026-06-12T04:43:24.715Z] Route not found: /api/shipments
+[2026-06-12T04:43:26.025Z] Authentication token is required.
+[2026-06-12T04:43:26.032Z] Authentication token is required.

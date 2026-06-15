@@ -1,0 +1,86 @@
+{
+  "info": {
+    "name": "ORBEM Operations Performance Dashboard",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@orbem.local\",\n  \"password\": \"password\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Dashboard Summary",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/dashboard/summary"
+      }
+    },
+    {
+      "name": "List Bookings",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/bookings"
+      }
+    },
+    {
+      "name": "Create Booking",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/bookings",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customer_name\": \"Demo Customer\",\n  \"customer_email\": \"demo@example.com\",\n  \"customer_phone\": \"+91 90000 11111\",\n  \"company_name\": \"Demo Exports\",\n  \"origin_airport\": \"BOM\",\n  \"destination_airport\": \"DXB\",\n  \"pickup_city\": \"Mumbai\",\n  \"delivery_city\": \"Dubai\",\n  \"cargo_type\": \"Retail Goods\",\n  \"cargo_description\": \"Sample cartons\",\n  \"package_count\": 2,\n  \"actual_weight\": 50,\n  \"length_cm\": 60,\n  \"width_cm\": 40,\n  \"height_cm\": 40,\n  \"shipment_status\": \"Booked\",\n  \"booking_date\": \"2026-06-11\",\n  \"expected_delivery_date\": \"2026-06-15\",\n  \"priority\": \"Normal\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Assistant Chat",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": "{{baseUrl}}/assistant/chat",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Summarize delayed shipments\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Run Alert Check",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/notifications/run-alert-check"
+      }
+    },
+    {
+      "name": "Bookings CSV",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": "{{baseUrl}}/reports/bookings.csv"
+      }
+    }
+  ]
+}
