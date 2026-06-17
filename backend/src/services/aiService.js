@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { query } = require('../config/db');
 const { getDashboardSummary, getBookingContext } = require('./dashboardSummaryService');
 
 function extractBookingId(message) {
@@ -16,41 +17,53 @@ function compactContext(context) {
   return JSON.stringify(context, null, 2).slice(0, 6000);
 }
 
-async function callOllama(prompt) {
-  if (!process.env.OLLAMA_BASE_URL) return null;
-  try {
-    const response = await axios.post(
-      `${process.env.OLLAMA_BASE_URL.replace(/\/$/, '')}/api/generate`,
-      {
-        model: process.env.OLLAMA_MODEL || 'llama3.2:3b',
-        prompt,
-        stream: false
-      },
-      { timeout: 20000 }
-    );
-    return response.data.response || null;
-  } catch (error) {
-    return null;
-  }
+function getGrokApiKey() {
+  return process.env.GROK_API_KEY;
 }
 
-async function callGemini(prompt) {
-  if (!process.env.GEMINI_API_KEY) return null;
+async function callGrok(prompt) {
+  const apiKey = getGrokApiKey();
+  if (!apiKey) {
+    return { reply: null, unavailableReason: 'missing-key' };
+  }
+
   try {
     const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      'https://api.x.ai/v1/chat/completions',
       {
-        contents: [
+        model: process.env.GROK_MODEL || 'grok-4.3',
+        temperature: 0.3,
+        messages: [
           {
-            parts: [{ text: prompt }]
+            role: 'system',
+            content: 'You are ORBEM Ops Assistant. Answer using the provided dashboard/database context.'
+          },
+          {
+            role: 'user',
+            content: prompt
           }
         ]
       },
-      { timeout: 20000 }
+      {
+        timeout: 30000,
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
     );
-    return response.data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+    return {
+      reply: response.data?.choices?.[0]?.message?.content || null,
+      unavailableReason: null
+    };
   } catch (error) {
-    return null;
+    const providerMessage =
+      error.response?.data?.error?.message ||
+      error.response?.data?.message ||
+      JSON.stringify(error.response?.data || {}) ||
+      error.message;
+    console.warn('Grok assistant request failed:', providerMessage);
+    return { reply: null, unavailableReason: 'request-failed' };
   }
 }
 
@@ -100,8 +113,24 @@ function ruleBasedResponse(message, context) {
 }
 
 async function buildAssistantContext(message) {
+  const dashboard = await getDashboardSummary({});
+  const recentAlerts = await query(
+    `SELECT title, message, type, severity, created_at
+     FROM notifications
+     ORDER BY created_at DESC, id DESC
+     LIMIT 8`
+  );
+
   const context = {
-    dashboard: await getDashboardSummary({})
+    dashboard,
+    databaseContext: {
+      totalBookings: dashboard.kpis.totalBookings,
+      completedShipments: dashboard.kpis.completedShipments,
+      pendingDocuments: dashboard.kpis.pendingDocuments,
+      delayedShipments: dashboard.kpis.delayedShipments,
+      pendingPayments: dashboard.kpis.pendingPayments,
+      recentAlerts
+    }
   };
 
   const bookingId = extractBookingId(message);
@@ -119,7 +148,7 @@ async function buildAssistantContext(message) {
 
 async function generateAssistantReply(message, user) {
   const context = await buildAssistantContext(message);
-  const prompt = `You are ORBEM Ops Assistant for ORBEM Solutions Private Limited.
+  const finalPrompt = `You are ORBEM Ops Assistant for ORBEM Solutions Private Limited.
 Use internal operations data first. Be concise, practical, and do not invent live cargo rates.
 
 User: ${user?.name || 'Operations user'} (${user?.role || 'Staff'})
@@ -130,18 +159,18 @@ ${compactContext(context)}
 
 Answer with clear operations next steps.`;
 
-  const ollama = await callOllama(prompt);
-  if (ollama) {
-    return { reply: ollama.trim(), provider: 'ollama', context };
+  const grok = await callGrok(finalPrompt);
+  if (grok.reply) {
+    return { reply: grok.reply.trim(), provider: 'grok', context };
   }
 
-  const gemini = await callGemini(prompt);
-  if (gemini) {
-    return { reply: gemini.trim(), provider: 'gemini', context };
-  }
+  const notice =
+    grok.unavailableReason === 'missing-key'
+      ? 'AI API key not configured. Using local assistant mode.'
+      : 'Grok is unavailable right now. Using local assistant mode.';
 
   return {
-    reply: `AI API key not configured. Using local assistant mode.\n\n${ruleBasedResponse(message, context)}`,
+    reply: `${notice}\n\n${ruleBasedResponse(message, context)}`,
     provider: 'rule-based',
     context
   };

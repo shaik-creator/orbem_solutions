@@ -1,11 +1,17 @@
 import axios from 'axios';
 
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
+  baseURL: API_BASE_URL,
   timeout: 20000
 });
 
 api.interceptors.request.use((config) => {
+  if (config.url?.startsWith('/') && !config.url.startsWith('/api/')) {
+    config.url = `/api${config.url}`;
+  }
+
   const token = localStorage.getItem('orbem_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -25,6 +31,14 @@ api.interceptors.response.use(
 );
 
 export function getErrorMessage(error) {
+  if (error.code === 'ERR_NETWORK' || error.message === 'Network Error' || !error.response) {
+    return 'Backend server is not running. Please start backend on the configured port.';
+  }
+
+  if (error.response?.status === 401) {
+    return error.response?.data?.message || 'Invalid email or password.';
+  }
+
   return error.response?.data?.message || error.message || 'Request failed. Please try again.';
 }
 

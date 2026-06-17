@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
         return;
       }
       try {
-        const response = await api.get('/auth/me');
+        const response = await api.get('/api/auth/me');
         if (mounted) {
           setUser(response.data.user);
           localStorage.setItem('orbem_user', JSON.stringify(response.data.user));
@@ -56,14 +56,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   async function login(credentials) {
-    const response = await api.post('/auth/login', credentials);
+    const response = await api.post('/api/auth/login', credentials);
     persistSession(response.data);
     setUser(response.data.user);
     return response.data.user;
   }
 
   async function register(payload) {
-    const response = await api.post('/auth/register', payload);
+    const response = await api.post('/api/auth/register', payload);
     persistSession(response.data);
     setUser(response.data.user);
     return response.data.user;

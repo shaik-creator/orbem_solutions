@@ -1,8 +1,19 @@
 import { Bot, User } from 'lucide-react';
 import { classNames, formatDate } from '../../utils/formatters';
 
+function getDisplayMessage(message) {
+  return String(message || '')
+    .replace(
+      /GROK_API_KEY is not configured or Grok is unavailable\. Using local assistant mode\./g,
+      'Assistant is running in local mode.'
+    )
+    .replace(/AI API key not configured\. Using local assistant mode\./g, 'Assistant is running in local mode.')
+    .replace(/Grok is unavailable right now\. Using local assistant mode\./g, 'Assistant is running in local mode.');
+}
+
 export default function ChatMessage({ message }) {
   const isAssistant = message.role === 'assistant';
+  const displayMessage = getDisplayMessage(message.message);
   return (
     <div className={classNames('flex gap-3', isAssistant ? 'justify-start' : 'justify-end')}>
       {isAssistant ? (
@@ -11,7 +22,7 @@ export default function ChatMessage({ message }) {
         </div>
       ) : null}
       <div className={classNames('max-w-[82%] rounded-lg px-4 py-3 text-sm shadow-sm', isAssistant ? 'bg-white text-gray-800' : 'bg-brand-600 text-white')}>
-        <p className="whitespace-pre-wrap leading-6">{message.message}</p>
+        <p className="whitespace-pre-wrap leading-6">{displayMessage}</p>
         {message.created_at ? (
           <p className={classNames('mt-2 text-xs', isAssistant ? 'text-gray-400' : 'text-brand-100')}>{formatDate(message.created_at)}</p>
         ) : null}

@@ -50,7 +50,7 @@
 - Ask about chargeable weight.
 - Ask for a customer update using a booking ID.
 - Ask for route or rate context using airport codes such as `BOM DXB`.
-- Stop Ollama and Gemini, then confirm rule-based fallback still responds.
+- Remove `GROK_API_KEY`, restart the backend, then confirm rule-based fallback still responds.
 
 ## Alerts and Reports
 

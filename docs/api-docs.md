@@ -73,7 +73,7 @@ airline_name,origin_airport,destination_airport,rate_per_kg,fuel_surcharge,handl
 - `POST /assistant/chat`
 - `GET /assistant/history`
 
-Provider order: Ollama, Gemini, rule-based fallback.
+Provider order: Grok API, rule-based fallback.
 
 ## Notifications
 

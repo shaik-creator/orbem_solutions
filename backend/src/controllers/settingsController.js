@@ -1,4 +1,3 @@
-const axios = require('axios');
 const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/errorMiddleware');
 const { assertPhone, createHttpError } = require('../utils/validators');
@@ -297,37 +296,18 @@ const updateProfile = asyncHandler(async (req, res) => {
   res.json({ message: 'Profile updated.', user, settings });
 });
 
-async function getOllamaStatus() {
-  const baseUrl = process.env.OLLAMA_BASE_URL;
-  if (!baseUrl) return { provider: 'Ollama local', status: 'unavailable', detail: 'Not configured' };
-
-  try {
-    await axios.get(`${baseUrl.replace(/\/$/, '')}/api/tags`, { timeout: 1200 });
-    return {
-      provider: 'Ollama local',
-      status: 'connected',
-      detail: process.env.OLLAMA_MODEL || 'Local model configured'
-    };
-  } catch {
-    return {
-      provider: 'Ollama local',
-      status: 'unavailable',
-      detail: 'Configured but not reachable'
-    };
-  }
-}
-
 const aiStatus = asyncHandler(async (req, res) => {
-  const ollama = await getOllamaStatus();
+  const grokConfigured = Boolean(process.env.GROK_API_KEY);
   res.json({
     providers: [
-      { provider: 'Rule-based fallback', status: 'connected', detail: 'Always available' },
-      ollama,
       {
-        provider: 'Gemini optional',
-        status: process.env.GEMINI_API_KEY ? 'configured' : 'unavailable',
-        detail: process.env.GEMINI_API_KEY ? 'API key configured on backend' : 'No backend API key configured'
-      }
+        provider: 'Grok API',
+        status: grokConfigured ? 'configured' : 'unavailable',
+        detail: grokConfigured
+          ? `${process.env.GROK_MODEL || 'grok-4.3'} configured on backend`
+          : 'Set GROK_API_KEY in backend/.env'
+      },
+      { provider: 'Rule-based fallback', status: 'connected', detail: 'Always available when Grok is unavailable' }
     ]
   });
 });

@@ -11,7 +11,7 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 - Revenue and payment tracking with overdue balances
 - Internal airline rate manager with CSV import/export and cheapest route comparison
 - Dashboard KPIs, charts, filters, and operational tables
-- ORBEM Ops Assistant using internal data, optional Ollama, optional Gemini, and rule-based fallback
+- ORBEM Ops Assistant using internal data, one Grok API key, and rule-based fallback
 - In-app notifications with cron/manual alert checks
 - CSV reports and printable dashboard/report views
 - WhatsApp-style settings page for account, profile, privacy, notifications, appearance, assistant, data, reports, security, support, and project information
@@ -26,7 +26,7 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 - Frontend: React, Vite, Tailwind CSS, React Router, Axios, Recharts, Lucide React
 - Backend: Node.js, Express, MySQL, JWT, bcryptjs, CORS, dotenv, node-cron, Nodemailer, Axios
 - Database: MySQL
-- Optional AI: Ollama local model, Gemini API key
+- Optional AI: Grok API key on the backend
 
 ## Folder Structure
 
@@ -296,7 +296,16 @@ copy .env.example .env
 npm run dev
 ```
 
-Update `backend/.env` with your MySQL credentials and a stronger `JWT_SECRET`.
+Update `backend/.env` with your MySQL credentials, a stronger `JWT_SECRET`, and your Grok key.
+
+For submission, the only AI key needed is:
+
+```env
+GROK_API_KEY=your_xai_key_here
+GROK_MODEL=grok-4.3
+```
+
+Do not paste the real key into `.env.example`, README, or any tracked file. Keep it only in `backend/.env`, which is ignored by Git.
 
 ## Frontend Setup
 
@@ -307,33 +316,36 @@ copy .env.example .env
 npm run dev
 ```
 
-Frontend runs on `http://localhost:5173`. Backend runs on `http://localhost:5000`.
-
-## Ollama Chatbot
-
-1. Install Ollama from `https://ollama.com`.
-2. Pull the local model:
-   ```bash
-   ollama pull llama3.2:3b
-   ```
-3. Keep Ollama running at `http://localhost:11434`.
-4. Backend `.env` defaults:
-   ```env
-   OLLAMA_BASE_URL=http://localhost:11434
-   OLLAMA_MODEL=llama3.2:3b
-   ```
-
-If Ollama is unavailable, the assistant tries Gemini when configured, then uses the rule-based fallback.
-
-## Optional Gemini
-
-Set only on the backend:
+Set the frontend backend URL without `/api`:
 
 ```env
-GEMINI_API_KEY=your_key_here
+VITE_API_BASE_URL=http://localhost:5000
 ```
 
-No API keys are exposed to the frontend.
+Frontend runs on `http://localhost:5173`. Backend runs on `http://localhost:5000`.
+
+## Grok Assistant
+
+Set one Grok/xAI key only on the backend:
+
+```env
+GROK_API_KEY=your_xai_key_here
+GROK_MODEL=grok-4.3
+```
+
+The backend calls the xAI chat completions API from `backend/src/services/aiService.js`. The frontend never receives the key. If `GROK_API_KEY` is missing or the request fails, the assistant uses the local rule-based fallback so the demo still runs.
+
+After adding or changing `GROK_API_KEY`, restart the backend:
+
+```bash
+npm run dev --prefix backend
+```
+
+Check provider status inside the app from Settings, or call:
+
+```text
+GET http://localhost:5000/api/settings/ai-status
+```
 
 ## API Testing
 
@@ -420,5 +432,5 @@ To test settings:
 - `ER_NO_SUCH_TABLE activity_logs`, `tasks`, or `calendar_events`: run `backend/src/database/feature-upgrades-migration.sql`.
 - `Unknown column status_message`: run the settings migration against the active database.
 - `Invalid email or password`: confirm seed data was imported and use password `password`.
-- `CORS error`: confirm `CLIENT_URL=http://localhost:5173` in backend `.env`.
-- `Ollama request failed`: start Ollama or leave fallback assistant enabled.
+- `CORS error`: confirm `CORS_ORIGIN=http://localhost:5173` in backend `.env`.
+- `Grok assistant request failed`: confirm `GROK_API_KEY` is set in `backend/.env`, then restart the backend.

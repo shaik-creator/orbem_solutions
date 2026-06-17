@@ -6,7 +6,7 @@
 - Use a dedicated MySQL user with limited permissions.
 - Keep `.env` files out of version control.
 - Serve the backend behind HTTPS.
-- Set `CLIENT_URL` to the deployed frontend URL.
+- Set `CORS_ORIGIN` to the deployed frontend URL.
 - Run the frontend build before hosting.
 
 ## Backend
@@ -36,7 +36,7 @@ npm run build
 Host `frontend/dist` on any static host. Set:
 
 ```env
-VITE_API_BASE_URL=https://your-api-domain/api
+VITE_API_BASE_URL=https://your-api-domain
 ```
 
 Then rebuild.
@@ -47,6 +47,5 @@ Import schema and seed only for demo environments. For production, import schema
 
 ## Optional Services
 
-- Ollama can run on the same machine as backend or another internal host.
-- Gemini requires only a backend key.
+- Grok requires only `GROK_API_KEY` in the backend `.env`.
 - SMTP is optional.

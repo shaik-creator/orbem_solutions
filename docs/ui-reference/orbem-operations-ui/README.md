@@ -18,6 +18,17 @@ Complete React + Vite UI for ORBEM Solutions Private Limited air-cargo operation
 - Profile page
 - WhatsApp-style settings page
 
+## Assistant API
+
+This folder is a static UI reference. The working full-stack project uses a single backend Grok key:
+
+```env
+GROK_API_KEY=your_xai_key_here
+GROK_MODEL=grok-4.3
+```
+
+Set the real key only in the main project file `backend/.env`. Do not add real API keys to this UI reference or to tracked README files.
+
 ## Run
 ```bash
 npm install
