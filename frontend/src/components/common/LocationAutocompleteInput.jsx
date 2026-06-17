@@ -4,48 +4,63 @@ import { classNames } from '../../utils/formatters';
 
 const MIN_SEARCH_LENGTH = 3;
 const SEARCH_DEBOUNCE_MS = 400;
-const NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
+const LOCAL_LOCATIONS = [
+  ['BOM', 'Mumbai', 'Chhatrapati Shivaji Maharaj International Airport, Maharashtra, India'],
+  ['DEL', 'Delhi NCR', 'Indira Gandhi International Airport, Delhi, India'],
+  ['BLR', 'Bengaluru', 'Kempegowda International Airport, Karnataka, India'],
+  ['HYD', 'Hyderabad', 'Rajiv Gandhi International Airport, Telangana, India'],
+  ['MAA', 'Chennai', 'Chennai International Airport, Tamil Nadu, India'],
+  ['CCU', 'Kolkata', 'Netaji Subhas Chandra Bose International Airport, West Bengal, India'],
+  ['AMD', 'Ahmedabad', 'Sardar Vallabhbhai Patel International Airport, Gujarat, India'],
+  ['COK', 'Kochi', 'Cochin International Airport, Kerala, India'],
+  ['PNQ', 'Pune', 'Pune Airport, Maharashtra, India'],
+  ['JAI', 'Jaipur', 'Jaipur International Airport, Rajasthan, India'],
+  ['GOI', 'Goa', 'Dabolim Airport, Goa, India'],
+  ['TRV', 'Thiruvananthapuram', 'Trivandrum International Airport, Kerala, India'],
+  ['IXC', 'Chandigarh', 'Chandigarh International Airport, India'],
+  ['LKO', 'Lucknow', 'Chaudhary Charan Singh International Airport, Uttar Pradesh, India'],
+  ['DXB', 'Dubai', 'Dubai International Airport, United Arab Emirates'],
+  ['DOH', 'Doha', 'Hamad International Airport, Qatar'],
+  ['SIN', 'Singapore', 'Changi Airport, Singapore'],
+  ['HKG', 'Hong Kong', 'Hong Kong International Airport'],
+  ['LHR', 'London', 'Heathrow Airport, United Kingdom'],
+  ['FRA', 'Frankfurt', 'Frankfurt Airport, Germany'],
+  ['AMS', 'Amsterdam', 'Amsterdam Schiphol Airport, Netherlands'],
+  ['BKK', 'Bangkok', 'Suvarnabhumi Airport, Thailand'],
+  ['JED', 'Jeddah', 'King Abdulaziz International Airport, Saudi Arabia'],
+  ['KUL', 'Kuala Lumpur', 'Kuala Lumpur International Airport, Malaysia']
+].map(([code, name, address]) => ({
+  id: code,
+  name,
+  address,
+  fullAddress: `${code} - ${name}, ${address}`,
+  lat: null,
+  lon: null,
+  type: 'airport',
+  class: 'logistics-node',
+  addressDetails: {},
+  code
+}));
 
-function buildSecondaryAddress(result, mainName) {
-  const displayParts = String(result.display_name || '')
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
+function searchLocalLocations(query) {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
 
-  const secondaryParts = displayParts.filter((part, index) => index !== 0 && part.toLowerCase() !== String(mainName).toLowerCase());
-  return secondaryParts.slice(0, 3).join(', ') || displayParts.slice(1, 4).join(', ') || result.display_name || '';
-}
-
-function getMainName(result) {
-  const address = result.address || {};
-  return (
-    result.name ||
-    address.city ||
-    address.town ||
-    address.village ||
-    address.municipality ||
-    address.suburb ||
-    address.county ||
-    String(result.display_name || '').split(',')[0]?.trim() ||
-    'Location'
-  );
-}
-
-function formatLocationResult(result) {
-  const mainName = getMainName(result);
-
-  return {
-    id: result.place_id,
-    name: mainName,
-    address: buildSecondaryAddress(result, mainName),
-    fullAddress: result.display_name,
-    lat: Number(result.lat),
-    lon: Number(result.lon),
-    type: result.type,
-    class: result.class,
-    addressDetails: result.address || {},
-    code: mainName.replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase() || 'LOC'
-  };
+  return LOCAL_LOCATIONS
+    .map((location) => {
+      const haystack = `${location.code} ${location.name} ${location.address} ${location.fullAddress}`.toLowerCase();
+      const startsWithCode = location.code.toLowerCase().startsWith(normalized);
+      const startsWithName = location.name.toLowerCase().startsWith(normalized);
+      const contains = haystack.includes(normalized);
+      return {
+        location,
+        score: startsWithCode ? 0 : startsWithName ? 1 : contains ? 2 : 99
+      };
+    })
+    .filter((entry) => entry.score < 99)
+    .sort((a, b) => a.score - b.score || a.location.name.localeCompare(b.location.name))
+    .slice(0, 6)
+    .map((entry) => entry.location);
 }
 
 export default function LocationAutocompleteInput({
@@ -107,51 +122,23 @@ export default function LocationAutocompleteInput({
       return undefined;
     }
 
-    const controller = new AbortController();
     setLookupError('');
+    setLoading(true);
     setShowDropdown(true);
 
-    const timer = window.setTimeout(async () => {
-      try {
-        setLoading(true);
-        const searchParams = new URLSearchParams({
-          format: 'json',
-          addressdetails: '1',
-          limit: '6',
-          countrycodes: 'in',
-          q: trimmedValue
-        });
-        const response = await fetch(`${NOMINATIM_SEARCH_URL}?${searchParams.toString()}`, {
-          signal: controller.signal,
-          headers: {
-            Accept: 'application/json'
-          }
-        });
+    const timer = window.setTimeout(() => {
+      setLoading(false);
+      if (requestId !== requestIdRef.current) return;
 
-        if (!response.ok) throw new Error('Unable to load locations. Try again.');
-
-        const results = await response.json();
-        if (requestId !== requestIdRef.current) return;
-
-        const formattedResults = Array.isArray(results) ? results.map(formatLocationResult) : [];
-        setPredictions(formattedResults);
-        setActiveIndex(formattedResults.length ? 0 : -1);
-        setShowDropdown(true);
-        setLookupError(formattedResults.length ? '' : 'No locations found');
-      } catch (err) {
-        if (err.name === 'AbortError' || requestId !== requestIdRef.current) return;
-        setPredictions([]);
-        setActiveIndex(-1);
-        setShowDropdown(true);
-        setLookupError('Unable to load locations. Try again.');
-      } finally {
-        if (requestId === requestIdRef.current) setLoading(false);
-      }
+      const results = searchLocalLocations(trimmedValue);
+      setPredictions(results);
+      setActiveIndex(results.length ? 0 : -1);
+      setShowDropdown(true);
+      setLookupError(results.length ? '' : 'No saved ORBEM locations found');
     }, SEARCH_DEBOUNCE_MS);
 
     return () => {
       window.clearTimeout(timer);
-      controller.abort();
     };
   }, [disabled, inputValue]);
 

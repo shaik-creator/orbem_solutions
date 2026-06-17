@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { query } = require('../config/db');
+const { getJwtSecret } = require('../config/env');
 
 async function protect(req, res, next) {
   try {
@@ -12,7 +13,7 @@ async function protect(req, res, next) {
       throw error;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'change_this_secret');
+    const decoded = jwt.verify(token, getJwtSecret());
     const users = await query('SELECT * FROM users WHERE id = ? LIMIT 1', [decoded.id]);
 
     if (!users.length || !users[0].is_active) {

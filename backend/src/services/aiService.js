@@ -1,7 +1,5 @@
 const axios = require('axios');
 const { getDashboardSummary, getBookingContext } = require('./dashboardSummaryService');
-const { getWeather, getWeatherForRoute } = require('./weatherService');
-const { getRouteAirspaceContext } = require('./openSkyService');
 
 function extractBookingId(message) {
   const match = String(message || '').match(/ORB-\d{4}-\d{4}/i);
@@ -12,14 +10,6 @@ function extractAirportCodes(message) {
   const known = ['BOM', 'BLR', 'DEL', 'HYD', 'AMD', 'MAA', 'JAI', 'COK', 'CCU', 'PNQ', 'DXB', 'SIN', 'LHR', 'DOH', 'FRA', 'HKG', 'AMS', 'BKK', 'JED'];
   const text = String(message || '').toUpperCase();
   return known.filter((code) => new RegExp(`\\b${code}\\b`).test(text));
-}
-
-function wantsWeather(message) {
-  return /weather|rain|wind|temperature|storm|risk/i.test(message);
-}
-
-function wantsAirspace(message) {
-  return /opensky|airspace|air traffic|aircraft|flight context|live traffic/i.test(message);
 }
 
 function compactContext(context) {
@@ -102,12 +92,8 @@ function ruleBasedResponse(message, context) {
     return `Reminder: Please review ${booking.booking_id}, currently ${booking.shipment_status}, priority ${booking.priority}. Check pending documents, payment balance, and next shipment milestone today.`;
   }
 
-  if (context.weather) {
-    return `Weather context: ${JSON.stringify(context.weather)}. Use this as a risk signal only; confirm with airline operations before changing dispatch plans.`;
-  }
-
-  if (context.airspace) {
-    return `Live airspace context: ${JSON.stringify(context.airspace)}. OpenSky can be unavailable or incomplete, so treat this as supporting context.`;
+  if (text.includes('weather') || text.includes('airspace') || text.includes('flight tracking')) {
+    return 'Live weather, airspace, and flight-tracking APIs are not connected in this demo build. Use airline/carrier portals for live movement checks, then update ORBEM booking milestones and customer notes.';
   }
 
   return `Current dashboard summary: ${kpis.totalBookings || 0} bookings, ${kpis.completedShipments || 0} completed shipments, ${kpis.pendingDocuments || 0} bookings with pending documents, ${kpis.delayedShipments || 0} delayed shipments, and INR ${Number(kpis.pendingPayments || 0).toFixed(2)} pending payments. Recommended next step: clear document blockers first, then contact owners for delayed and high-priority bookings.`;
@@ -124,23 +110,8 @@ async function buildAssistantContext(message) {
   }
 
   const airportCodes = extractAirportCodes(message);
-  if (wantsWeather(message)) {
-    if (airportCodes.length >= 2) {
-      context.weather = await getWeatherForRoute(airportCodes[0], airportCodes[1]);
-    } else if (airportCodes.length === 1) {
-      context.weather = await getWeather(airportCodes[0]);
-    }
-  }
-
-  if (wantsAirspace(message)) {
-    if (airportCodes.length >= 2) {
-      context.airspace = await getRouteAirspaceContext(airportCodes[0], airportCodes[1]);
-    } else if (context.booking?.booking) {
-      context.airspace = await getRouteAirspaceContext(
-        context.booking.booking.origin_airport,
-        context.booking.booking.destination_airport
-      );
-    }
+  if (airportCodes.length) {
+    context.routeCodes = airportCodes;
   }
 
   return context;
@@ -170,7 +141,7 @@ Answer with clear operations next steps.`;
   }
 
   return {
-    reply: ruleBasedResponse(message, context),
+    reply: `AI API key not configured. Using local assistant mode.\n\n${ruleBasedResponse(message, context)}`,
     provider: 'rule-based',
     context
   };

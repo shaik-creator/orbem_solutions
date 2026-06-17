@@ -100,7 +100,7 @@ export default function ChatbotPanel({ open = true, onClose, embedded = false, p
             className="min-h-11 flex-1 rounded-md border border-gray-300 px-3 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="Ask about bookings, alerts, documents, weather, rates"
+            placeholder="Ask about bookings, alerts, documents, revenue, rates"
           />
           <Button type="submit" icon={Send} loading={sending}>
             Send

@@ -45,8 +45,10 @@ app.get('/api/health', async (req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/shipments', bookingRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/revenue', paymentRoutes);
 app.use('/api/rates', rateRoutes);
 app.use('/api/assistant', assistantRoutes);
 app.use('/api/notifications', notificationRoutes);

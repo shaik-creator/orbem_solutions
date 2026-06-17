@@ -49,7 +49,7 @@
 - Ask about pending documents.
 - Ask about chargeable weight.
 - Ask for a customer update using a booking ID.
-- Ask for weather on `BOM DXB`.
+- Ask for route or rate context using airport codes such as `BOM DXB`.
 - Stop Ollama and Gemini, then confirm rule-based fallback still responds.
 
 ## Alerts and Reports
@@ -78,8 +78,8 @@
 
 ## Settings
 
-- Open the Settings page after login and confirm the left menu and right details panel render.
-- Open Account settings and verify current user name, email, role, phone, account status, and joined date.
+- Open the Settings page after login and confirm the centered mobile-style settings list renders.
+- Tap Account settings and verify current user name, email, role, phone, account status, and security summary.
 - Edit appearance theme, sidebar mode, density, table row size, card style, and accent color; confirm changes apply immediately.
 - Toggle a privacy setting, refresh, and confirm it persists.
 - Toggle a notification setting and update summary/quiet-hour timing.

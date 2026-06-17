@@ -49,5 +49,4 @@ Import schema and seed only for demo environments. For production, import schema
 
 - Ollama can run on the same machine as backend or another internal host.
 - Gemini requires only a backend key.
-- n8n webhook is optional.
 - SMTP is optional.

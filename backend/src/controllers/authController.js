@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { query } = require('../config/db');
+const { getJwtSecret } = require('../config/env');
 const { asyncHandler } = require('../middleware/errorMiddleware');
 const { assertRequired, assertEmail, assertPhone, assertIn, ROLES, createHttpError } = require('../utils/validators');
 
@@ -10,7 +11,7 @@ function signToken(user) {
       id: user.id,
       role: user.role
     },
-    process.env.JWT_SECRET || 'change_this_secret',
+    getJwtSecret(),
     { expiresIn: '8h' }
   );
 }

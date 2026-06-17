@@ -28,6 +28,20 @@ const listPayments = asyncHandler(async (req, res) => {
   res.json({ payments: rows });
 });
 
+const revenueSummary = asyncHandler(async (req, res) => {
+  const rows = await query(
+    `SELECT
+       COALESCE(SUM(invoice_amount), 0) AS invoiced,
+       COALESCE(SUM(paid_amount), 0) AS received,
+       COALESCE(SUM(balance_amount), 0) AS pending,
+       SUM(CASE WHEN payment_status = 'Overdue' THEN 1 ELSE 0 END) AS overdue_count,
+       COUNT(*) AS payment_count
+     FROM payments`
+  );
+
+  res.json({ summary: rows[0] || { invoiced: 0, received: 0, pending: 0, overdue_count: 0, payment_count: 0 } });
+});
+
 const updatePayment = asyncHandler(async (req, res) => {
   assertNonNegative(req.body, ['quotation_amount', 'invoice_amount', 'paid_amount']);
   assertDate(req.body.payment_date, 'Payment date');
@@ -80,5 +94,6 @@ const updatePayment = asyncHandler(async (req, res) => {
 
 module.exports = {
   listPayments,
+  revenueSummary,
   updatePayment
 };

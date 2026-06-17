@@ -13,6 +13,7 @@ router.use(protect);
 router.get('/bookings.csv', bookingsCsv);
 router.get('/revenue.csv', revenueCsv);
 router.get('/pending-documents.csv', pendingDocumentsCsv);
+router.get('/summary', monthlySummary);
 router.get('/monthly-summary', monthlySummary);
 
 module.exports = router;

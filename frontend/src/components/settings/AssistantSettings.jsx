@@ -1,4 +1,4 @@
-import { Bot, CheckCircle2, Eraser, MessageSquareText, Radar, Sparkles, XCircle } from 'lucide-react';
+import { Bot, CheckCircle2, Eraser, MessageSquareText, Sparkles, XCircle } from 'lucide-react';
 import Button from '../common/Button';
 import Select from '../common/Select';
 import SettingsRow from './SettingsRow';
@@ -7,9 +7,7 @@ import ToggleSwitch from './ToggleSwitch';
 const toggleRows = [
   ['assistant.enabled', Bot, 'Enable ORBEM Ops Assistant', 'Show assistant access and allow operations chat features.'],
   ['assistant.allowDashboardSummary', Sparkles, 'Allow dashboard summaries', 'Let the assistant summarize KPIs, delayed shipments, documents, and payments.'],
-  ['assistant.allowCustomerMessages', MessageSquareText, 'Draft customer messages', 'Allow customer-facing drafts using booking context.'],
-  ['assistant.allowWeatherContext', Radar, 'Check weather context', 'Allow optional route weather context when requested.'],
-  ['assistant.allowAirspaceContext', Radar, 'Check airspace context', 'Allow optional OpenSky airspace context when requested.']
+  ['assistant.allowCustomerMessages', MessageSquareText, 'Draft customer messages', 'Allow customer-facing drafts using booking context.']
 ];
 
 export default function AssistantSettings({ settings, aiStatus, aiLoading, onRefreshAi, onSettingChange, onClearChat, savingKey }) {

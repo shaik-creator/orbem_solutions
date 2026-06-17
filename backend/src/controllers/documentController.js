@@ -21,6 +21,35 @@ async function ensureDocuments(bookingId) {
   });
 }
 
+const listDocuments = asyncHandler(async (req, res) => {
+  const where = [];
+  const params = [];
+
+  if (req.query.status) {
+    where.push('d.status = ?');
+    params.push(req.query.status);
+  }
+
+  if (req.query.q) {
+    where.push('(b.booking_id LIKE ? OR b.customer_name LIKE ? OR b.company_name LIKE ? OR d.document_type LIKE ?)');
+    const value = `%${req.query.q}%`;
+    params.push(value, value, value, value);
+  }
+
+  const rows = await query(
+    `SELECT d.*, b.booking_id AS booking_code, b.customer_name, b.company_name,
+            b.shipment_status, b.expected_delivery_date
+     FROM documents d
+     JOIN bookings b ON b.id = d.booking_id
+     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY d.updated_at DESC, d.id DESC
+     LIMIT 200`,
+    params
+  );
+
+  res.json({ documents: rows });
+});
+
 const getByBooking = asyncHandler(async (req, res) => {
   const bookings = await query('SELECT id, booking_id, customer_name FROM bookings WHERE id = ? LIMIT 1', [
     req.params.bookingId
@@ -62,6 +91,7 @@ const updateStatus = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+  listDocuments,
   getByBooking,
   updateStatus
 };

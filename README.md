@@ -12,7 +12,6 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 - Internal airline rate manager with CSV import/export and cheapest route comparison
 - Dashboard KPIs, charts, filters, and operational tables
 - ORBEM Ops Assistant using internal data, optional Ollama, optional Gemini, and rule-based fallback
-- Optional Open-Meteo weather and OpenSky airspace context
 - In-app notifications with cron/manual alert checks
 - CSV reports and printable dashboard/report views
 - WhatsApp-style settings page for account, profile, privacy, notifications, appearance, assistant, data, reports, security, support, and project information
@@ -27,7 +26,6 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 - Frontend: React, Vite, Tailwind CSS, React Router, Axios, Recharts, Lucide React
 - Backend: Node.js, Express, MySQL, JWT, bcryptjs, CORS, dotenv, node-cron, Nodemailer, Axios
 - Database: MySQL
-- Optional automation: n8n webhook
 - Optional AI: Ollama local model, Gemini API key
 
 ## Folder Structure
@@ -93,10 +91,7 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 │   │   │   ├── activityService.js
 │   │   │   ├── aiService.js
 │   │   │   ├── alertService.js
-│   │   │   ├── dashboardSummaryService.js
-│   │   │   ├── n8nService.js
-│   │   │   ├── openSkyService.js
-│   │   │   └── weatherService.js
+│   │   │   └── dashboardSummaryService.js
 │   │   │
 │   │   ├── 📁 utils/
 │   │   │   ├── chargeableWeight.js
@@ -232,7 +227,6 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 ├── 📁 docs/
 │   ├── 📄 api-docs.md
 │   ├── 📄 deployment-guide.md
-│   ├── 📄 n8n-workflow.md
 │   ├── 📄 postman-collection.json
 │   └── 📄 test-cases.md
 │
@@ -247,7 +241,7 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 - `src/controllers/` - API request handlers for all routes
 - `src/middleware/` - Authentication, role-based access, and error handling middleware
 - `src/routes/` - Express route definitions for all modules
-- `src/services/` - Business logic for AI assistant, weather, airspace data, alerts, and n8n integration
+- `src/services/` - Business logic for AI assistant, alerts, activity logging, and dashboard summaries
 - `src/utils/` - Shared utilities: validators, CSV export, chargeable weight calculation
 - `src/database/` - SQL schema, seed data, and migration scripts
 
@@ -261,7 +255,6 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 **docs/**
 - API documentation and setup guides
 - Postman collection for API testing
-- n8n workflow configuration
 - Test case documentation
 
 ## Database Setup
@@ -341,16 +334,6 @@ GEMINI_API_KEY=your_key_here
 ```
 
 No API keys are exposed to the frontend.
-
-## Optional n8n
-
-Set this in `backend/.env`:
-
-```env
-N8N_WEBHOOK_URL=https://your-n8n-host/webhook/orbem-alerts
-```
-
-Alert checks will send payloads to n8n when configured. See [docs/n8n-workflow.md](docs/n8n-workflow.md).
 
 ## API Testing
 
@@ -438,5 +421,4 @@ To test settings:
 - `Unknown column status_message`: run the settings migration against the active database.
 - `Invalid email or password`: confirm seed data was imported and use password `password`.
 - `CORS error`: confirm `CLIENT_URL=http://localhost:5173` in backend `.env`.
-- `Live data unavailable`: optional weather/airspace provider failed or rate-limited; the app continues.
 - `Ollama request failed`: start Ollama or leave fallback assistant enabled.

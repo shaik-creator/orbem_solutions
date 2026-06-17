@@ -54,9 +54,7 @@ export const defaultSettings = {
     enabled: true,
     tone: 'professional',
     allowDashboardSummary: true,
-    allowCustomerMessages: true,
-    allowWeatherContext: true,
-    allowAirspaceContext: true
+    allowCustomerMessages: true
   },
   reports: {
     defaultFormat: 'csv',
@@ -65,6 +63,19 @@ export const defaultSettings = {
     includeFiltersSummary: true,
     monthlyReminder: false,
     defaultDateRange: 'this_month'
+  },
+  accessibility: {
+    highContrast: false,
+    reduceMotion: false,
+    largeTapTargets: false
+  },
+  language: {
+    preferred: 'en',
+    region: 'en-IN'
+  },
+  updates: {
+    showReleaseNotes: true,
+    notify: false
   }
 };
 

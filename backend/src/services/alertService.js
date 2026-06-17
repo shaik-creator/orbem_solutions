@@ -1,7 +1,6 @@
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 const { query, transaction } = require('../config/db');
-const { sendToN8n } = require('./n8nService');
 const { logActivity } = require('./activityService');
 
 async function createEmailTransporter() {
@@ -21,12 +20,6 @@ async function createEmailTransporter() {
 }
 
 async function notifyOptionalChannels(notification) {
-  await sendToN8n({
-    event: 'operations_alert',
-    notification,
-    createdAt: new Date().toISOString()
-  });
-
   const transporter = await createEmailTransporter();
   if (!transporter || !process.env.SMTP_FROM) return;
 

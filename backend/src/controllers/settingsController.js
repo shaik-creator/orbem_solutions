@@ -54,9 +54,7 @@ const DEFAULT_SETTINGS = {
     enabled: true,
     tone: 'professional',
     allowDashboardSummary: true,
-    allowCustomerMessages: true,
-    allowWeatherContext: true,
-    allowAirspaceContext: true
+    allowCustomerMessages: true
   },
   reports: {
     defaultFormat: 'csv',
@@ -65,6 +63,19 @@ const DEFAULT_SETTINGS = {
     includeFiltersSummary: true,
     monthlyReminder: false,
     defaultDateRange: 'this_month'
+  },
+  accessibility: {
+    highContrast: false,
+    reduceMotion: false,
+    largeTapTargets: false
+  },
+  language: {
+    preferred: 'en',
+    region: 'en-IN'
+  },
+  updates: {
+    showReleaseNotes: true,
+    notify: false
   }
 };
 
@@ -80,7 +91,9 @@ const OPTION_VALUES = {
   'appearance.accentColor': ['blue', 'green', 'purple', 'orange', 'slate'],
   'assistant.tone': ['professional', 'short', 'detailed'],
   'reports.defaultFormat': ['csv', 'pdf-ready'],
-  'reports.defaultDateRange': ['today', 'this_week', 'this_month', 'custom']
+  'reports.defaultDateRange': ['today', 'this_week', 'this_month', 'custom'],
+  'language.preferred': ['en'],
+  'language.region': ['en-IN', 'en-US']
 };
 
 const TIME_KEYS = new Set([
@@ -314,11 +327,6 @@ const aiStatus = asyncHandler(async (req, res) => {
         provider: 'Gemini optional',
         status: process.env.GEMINI_API_KEY ? 'configured' : 'unavailable',
         detail: process.env.GEMINI_API_KEY ? 'API key configured on backend' : 'No backend API key configured'
-      },
-      {
-        provider: 'Grok/xAI optional',
-        status: process.env.XAI_API_KEY ? 'configured' : 'unavailable',
-        detail: process.env.XAI_API_KEY ? 'API key configured on backend' : 'No backend API key configured'
       }
     ]
   });
