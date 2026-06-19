@@ -28,6 +28,25 @@ Operations Performance Dashboard is a full-stack web application for ORBEM Solut
 - Database: MySQL
 - Optional AI: Grok API key on the backend
 
+## Presentation Setup
+
+1. Start MySQL and import `backend/database/schema.sql`, then `backend/database/seed.sql`.
+2. Copy `backend/.env.example` to `backend/.env` and set the real DB password. Keep `GROK_API_KEY` only in the backend `.env`; the frontend must not contain the Grok key.
+3. Copy `frontend/.env.example` to `frontend/.env` and keep `VITE_API_BASE_URL=http://localhost:5000`.
+4. Start the backend with `cd backend && npm run dev`.
+5. Start the frontend with `cd frontend && npm run dev`.
+6. Check `http://localhost:5000/api/health` and `http://localhost:5000/api/health/db`.
+
+Demo login:
+
+- `admin@orbem.local` / `password`
+- `ops@orbem.local` / `password`
+- `accounts@orbem.local` / `password`
+
+Uploads are stored in `backend/uploads` and saved in MySQL through the `uploaded_files` table. Document uploads also update the matching `documents.file_id` and `documents.file_path` fields.
+
+The ORBEM assistant uses dashboard/database context from MySQL. If `GROK_API_KEY` is present, the backend calls Grok through `https://api.x.ai/v1/chat/completions`; if the key is missing or Grok fails, the assistant returns a local database answer with a simple local-mode notice.
+
 ## Folder Structure
 
 ```

@@ -2,7 +2,10 @@ USE operations_dashboard;
 
 SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE chat_messages;
+TRUNCATE TABLE assistant_messages;
+TRUNCATE TABLE alerts;
 TRUNCATE TABLE activity_logs;
+TRUNCATE TABLE staff_activity;
 TRUNCATE TABLE tasks;
 TRUNCATE TABLE calendar_events;
 TRUNCATE TABLE user_settings;
@@ -12,7 +15,12 @@ TRUNCATE TABLE complaints;
 TRUNCATE TABLE airline_rates;
 TRUNCATE TABLE payments;
 TRUNCATE TABLE documents;
+TRUNCATE TABLE uploaded_files;
+TRUNCATE TABLE shipment_timeline;
+TRUNCATE TABLE shipments;
 TRUNCATE TABLE shipment_milestones;
+TRUNCATE TABLE staff;
+TRUNCATE TABLE revenue;
 TRUNCATE TABLE bookings;
 TRUNCATE TABLE customers;
 TRUNCATE TABLE users;
@@ -74,6 +82,34 @@ INSERT INTO shipment_milestones (booking_id, status, location, remarks, created_
 (14, 'In Transit', 'Hyderabad Airport', 'Flight departed as planned.', 2, '2026-06-10 06:40:00'),
 (17, 'Delivered', 'Doha', 'Proof of delivery uploaded.', 4, '2026-06-10 14:05:00');
 
+INSERT INTO shipments (booking_id, awb_number, origin, destination, current_status, current_location, expected_delivery_date, is_delayed)
+SELECT
+  id,
+  CONCAT('AWB', LPAD(id, 6, '0')),
+  pickup_city,
+  delivery_city,
+  shipment_status,
+  pickup_city,
+  expected_delivery_date,
+  CASE
+    WHEN shipment_status = 'Delayed'
+      OR (expected_delivery_date < CURDATE() AND shipment_status NOT IN ('Delivered','Completed','Cancelled'))
+    THEN 1
+    ELSE 0
+  END
+FROM bookings;
+
+INSERT INTO shipment_timeline (shipment_id, status, location, note, created_by, created_at)
+SELECT
+  s.id,
+  m.status,
+  m.location,
+  m.remarks,
+  m.created_by,
+  m.created_at
+FROM shipment_milestones m
+JOIN shipments s ON s.booking_id = m.booking_id;
+
 INSERT INTO documents (booking_id, document_type, status, file_name, remarks, verified_by) VALUES
 (3, 'Airway Bill', 'Received', 'awb-orb-0003.pdf', 'Draft AWB received.', 3),
 (3, 'Invoice', 'Verified', 'invoice-orb-0003.pdf', 'Commercial invoice verified.', 3),
@@ -111,6 +147,10 @@ INSERT INTO payments (booking_id, quotation_amount, invoice_amount, paid_amount,
 (19, 89000.00, 91000.00, 0.00, 91000.00, 'Pending', NULL, NULL, '2026-06-25'),
 (20, 67000.00, 69000.00, 0.00, 69000.00, 'Pending', NULL, NULL, '2026-06-23');
 
+UPDATE payments
+SET paid_at = payment_date
+WHERE payment_date IS NOT NULL AND paid_amount > 0;
+
 INSERT INTO airline_rates (airline_name, origin_airport, destination_airport, rate_per_kg, fuel_surcharge, handling_charge, valid_from, valid_to, notes) VALUES
 ('Emirates SkyCargo', 'BOM', 'DXB', 245.00, 18.00, 4500.00, '2026-06-01', '2026-07-31', 'Reliable daily uplift for pharma and retail cargo.'),
 ('Emirates SkyCargo', 'DEL', 'DXB', 252.00, 18.00, 4600.00, '2026-06-01', '2026-07-31', 'Buyer nominated option available.'),
@@ -135,6 +175,27 @@ INSERT INTO notifications (title, message, type, severity, related_booking_id, c
 ('Delivery due tomorrow', 'ORB-2026-0010 is expected on 2026-06-12.', 'Reminder', 'Info', 10, '2026-06-11 09:00:00'),
 ('High priority booking pending', 'ORB-2026-0011 is high priority and still not dispatched.', 'Shipment', 'Warning', 11, '2026-06-11 09:05:00');
 
+INSERT INTO alerts (type, title, message, severity, related_entity_type, related_entity_id, is_read, created_at)
+SELECT type, title, message, severity, 'booking', related_booking_id, is_read, created_at
+FROM notifications;
+
+INSERT INTO staff (user_id, department, position, salary, join_date, is_active) VALUES
+(1, 'Management', 'Owner', 500000.00, '2024-01-15', 1),
+(2, 'Operations', 'Operations Manager', 150000.00, '2024-02-01', 1),
+(3, 'Documentation', 'Documentation Executive', 95000.00, '2024-03-10', 1),
+(4, 'Warehouse', 'Warehouse Coordinator', 85000.00, '2024-02-15', 1),
+(5, 'Finance', 'Accounts Manager', 130000.00, '2024-01-20', 1);
+
+INSERT INTO staff_activity (user_id, action, module, action_type, title, entity_type, entity_id, description, related_type, related_id, created_at) VALUES
+(1, 'Created', 'Booking', 'Create', 'Booking created', 'booking', 1, 'Apex Pharma shipment created.', 'booking', 1, '2026-06-10 09:10:00'),
+(2, 'Updated', 'Shipment', 'Update', 'Shipment status updated', 'shipment', 4, 'Delay status reviewed.', 'booking', 4, '2026-06-10 10:30:00'),
+(3, 'Verified', 'Document', 'Verify', 'Invoice verified', 'document', 2, 'Commercial invoice checked.', 'booking', 3, '2026-06-10 11:00:00'),
+(5, 'Updated', 'Revenue', 'Update', 'Payment received', 'payment', 17, 'Payment marked as paid.', 'booking', 17, '2026-06-10 14:20:00');
+
 INSERT INTO chat_messages (user_id, role, message, metadata) VALUES
 (1, 'user', 'Summarize delayed shipments.', JSON_OBJECT('source', 'seed')),
 (1, 'assistant', 'There are delayed shipments requiring follow-up, led by ORB-2026-0004 and ORB-2026-0009. Check carrier capacity and customer updates first.', JSON_OBJECT('provider', 'rule-based'));
+
+INSERT INTO assistant_messages (user_id, role, message) VALUES
+(1, 'user', 'How much revenue this month?'),
+(1, 'assistant', 'Assistant is running in local mode.\n\nCurrent dashboard revenue comes from paid payment rows in MySQL.');

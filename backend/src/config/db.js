@@ -14,6 +14,7 @@ const DB_SETUP_ERROR_CODES = new Set([
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
+  port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'operations_dashboard',
@@ -49,14 +50,14 @@ function getDatabaseSetupMessage(error) {
   }
 
   if (codes.has('ER_BAD_DB_ERROR')) {
-    return `Database "${process.env.DB_NAME || 'operations_dashboard'}" was not found. Create it and import backend/src/database/schema.sql, then backend/src/database/seed.sql.`;
+    return `Database "${process.env.DB_NAME || 'operations_dashboard'}" was not found. Create it and import backend/database/schema.sql, then backend/database/seed.sql.`;
   }
 
   if (codes.has('ER_NO_SUCH_TABLE')) {
-    return 'Database tables are missing. Import backend/src/database/schema.sql, then backend/src/database/seed.sql.';
+    return 'Database tables are missing. Import backend/database/schema.sql, then backend/database/seed.sql.';
   }
 
-  return `Database is unavailable. Start MySQL on ${process.env.DB_HOST || 'localhost'}:3306, then import backend/src/database/schema.sql and backend/src/database/seed.sql.`;
+  return `Database is unavailable. Start MySQL on ${process.env.DB_HOST || 'localhost'}:3306, then import backend/database/schema.sql and backend/database/seed.sql.`;
 }
 
 function normalizeDatabaseError(error) {
@@ -86,6 +87,89 @@ async function query(sql, params = []) {
   }
 }
 
+async function runMigrations() {
+  try {
+    // 1. Create revenue table if missing
+    await query(`
+      CREATE TABLE IF NOT EXISTS revenue (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        booking_id INT NULL,
+        customer_id INT NULL,
+        invoice_number VARCHAR(50) UNIQUE,
+        amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        balance_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+        payment_status ENUM('Paid','Pending','Partial','Overdue') DEFAULT 'Pending',
+        due_date DATE NULL,
+        paid_at DATE NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_revenue_booking FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE,
+        CONSTRAINT fk_revenue_customer FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 2. Add balance_amount column to revenue if missing
+    const columns = await query("SHOW COLUMNS FROM revenue LIKE 'balance_amount'");
+    if (columns.length === 0) {
+      await query("ALTER TABLE revenue ADD COLUMN balance_amount DECIMAL(12,2) NOT NULL DEFAULT 0");
+    }
+
+    // 3. Make sure payment_status enum is correct
+    await query("ALTER TABLE revenue MODIFY COLUMN payment_status ENUM('Paid','Pending','Partial','Overdue') DEFAULT 'Pending'");
+
+    // 4. Clean up payments table statuses and balances
+    await query(`
+      UPDATE payments
+      SET
+        balance_amount = GREATEST(invoice_amount - paid_amount, 0),
+        payment_status = CASE
+          WHEN GREATEST(invoice_amount - paid_amount, 0) <= 0 THEN 'Paid'
+          WHEN GREATEST(invoice_amount - paid_amount, 0) > 0 AND due_date < CURDATE() THEN 'Overdue'
+          WHEN GREATEST(invoice_amount - paid_amount, 0) > 0 AND paid_amount > 0 THEN 'Partial'
+          ELSE 'Pending'
+        END,
+        paid_at = CASE
+          WHEN GREATEST(invoice_amount - paid_amount, 0) <= 0 THEN COALESCE(paid_at, NOW())
+          ELSE NULL
+        END
+    `);
+
+    // 5. Clean up revenue table statuses and balances
+    await query(`
+      UPDATE revenue
+      SET
+        balance_amount = GREATEST(amount - paid_amount, 0),
+        payment_status = CASE
+          WHEN GREATEST(amount - paid_amount, 0) <= 0 THEN 'Paid'
+          WHEN GREATEST(amount - paid_amount, 0) > 0 AND due_date < CURDATE() THEN 'Overdue'
+          WHEN GREATEST(amount - paid_amount, 0) > 0 AND paid_amount > 0 THEN 'Partial'
+          ELSE 'Pending'
+        END,
+        paid_at = CASE
+          WHEN GREATEST(amount - paid_amount, 0) <= 0 THEN COALESCE(paid_at, NOW())
+          ELSE NULL
+        END
+    `);
+    
+    console.log('Database migrations and data cleanup completed successfully.');
+  } catch (error) {
+    console.error('Failed to run database migrations:', error.message);
+  }
+}
+
+async function testConnection() {
+  try {
+    await pool.query('SELECT 1');
+    await runMigrations();
+    return true;
+  } catch (error) {
+    const setupError = normalizeDatabaseError(error);
+    setupError.message = 'MySQL connection failed. Check backend/.env database settings.';
+    throw setupError;
+  }
+}
+
 async function transaction(callback) {
   let connection;
   try {
@@ -106,5 +190,6 @@ module.exports = {
   pool,
   query,
   transaction,
+  testConnection,
   normalizeDatabaseError
 };

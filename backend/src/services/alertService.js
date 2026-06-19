@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 const { query, transaction } = require('../config/db');
 const { logActivity } = require('./activityService');
+const socketHelper = require('../config/socket');
 
 async function createEmailTransporter() {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
@@ -87,6 +88,7 @@ async function markDelayedShipments() {
   await transaction(async (connection) => {
     const ids = candidates.map((booking) => booking.id);
     await connection.query('UPDATE bookings SET shipment_status = ? WHERE id IN (?)', ['Delayed', ids]);
+    await connection.query('UPDATE shipments SET current_status = ?, is_delayed = 1 WHERE booking_id IN (?)', ['Delayed', ids]);
     for (const booking of candidates) {
       await connection.query(
         `INSERT INTO shipment_milestones (booking_id, status, location, remarks)
@@ -96,12 +98,21 @@ async function markDelayedShipments() {
     }
   });
 
+  socketHelper.emit('bookings:update', { action: 'status_update' });
+  socketHelper.emit('shipments:update', { action: 'status_update' });
+  socketHelper.emit('dashboard:update', { type: 'delayed' });
+
   return candidates;
 }
 
 async function updateOverduePayments() {
   await query(
     `UPDATE payments
+     SET payment_status = 'Overdue'
+     WHERE balance_amount > 0 AND due_date < CURDATE() AND payment_status <> 'Paid'`
+  );
+  await query(
+    `UPDATE revenue
      SET payment_status = 'Overdue'
      WHERE balance_amount > 0 AND due_date < CURDATE() AND payment_status <> 'Paid'`
   );
@@ -210,6 +221,11 @@ async function runAlertChecks() {
       related_booking_id: row.id
     });
     if (created) notifications.push(created);
+  }
+
+  if (notifications.length > 0) {
+    socketHelper.emit('alerts:update', { action: 'run_checks' });
+    socketHelper.emit('dashboard:update', { type: 'alerts' });
   }
 
   return {

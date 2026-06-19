@@ -8,16 +8,19 @@ const chat = asyncHandler(async (req, res) => {
   const { message } = req.body;
   assertRequired(req.body, ['message']);
 
-  await query('INSERT INTO chat_messages (user_id, role, message, metadata) VALUES (?, ?, ?, JSON_OBJECT())', [
-    req.user.id,
-    'user',
-    message
-  ]);
-
-  const result = await generateAssistantReply(message, req.user);
+  // Store user message
   await query(
-    'INSERT INTO chat_messages (user_id, role, message, metadata) VALUES (?, ?, ?, ?)',
-    [req.user.id, 'assistant', result.reply, JSON.stringify({ provider: result.provider })]
+    'INSERT INTO assistant_messages (user_id, role, message) VALUES (?, ?, ?)',
+    [req.user.id, 'user', message]
+  );
+
+  // Generate assistant reply based on database context
+  const result = await generateAssistantReply(message, req.user);
+  
+  // Store assistant message
+  await query(
+    'INSERT INTO assistant_messages (user_id, role, message) VALUES (?, ?, ?)',
+    [req.user.id, 'assistant', result.reply]
   );
 
   await logActivity({
@@ -36,8 +39,8 @@ const chat = asyncHandler(async (req, res) => {
 
 const history = asyncHandler(async (req, res) => {
   const rows = await query(
-    `SELECT id, role, message, metadata, created_at
-     FROM chat_messages
+    `SELECT id, role, message, created_at
+     FROM assistant_messages
      WHERE user_id = ?
      ORDER BY created_at DESC, id DESC
      LIMIT 40`,

@@ -84,6 +84,14 @@ export default function Notifications() {
     loadNotifications();
   }, []);
 
+  useEffect(() => {
+    function refreshNotifications() {
+      loadNotifications();
+    }
+    window.addEventListener('orbem:refresh-notifications', refreshNotifications);
+    return () => window.removeEventListener('orbem:refresh-notifications', refreshNotifications);
+  }, []);
+
   async function markRead(notification) {
     try {
       await api.put(`/notifications/${notification.id}/read`);

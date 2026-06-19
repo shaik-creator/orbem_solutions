@@ -37,6 +37,14 @@ export default function Payments() {
     loadPayments();
   }, []);
 
+  useEffect(() => {
+    function refreshPayments() {
+      loadPayments();
+    }
+    window.addEventListener('orbem:refresh-payments', refreshPayments);
+    return () => window.removeEventListener('orbem:refresh-payments', refreshPayments);
+  }, []);
+
   async function savePayment(payload) {
     setSaving(true);
     setError('');
@@ -44,6 +52,7 @@ export default function Payments() {
       await api.put(`/payments/${selected.booking_db_id}`, payload);
       setSelected(null);
       await loadPayments();
+      window.dispatchEvent(new Event('orbem:refresh-dashboard'));
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {

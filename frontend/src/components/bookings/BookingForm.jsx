@@ -45,7 +45,8 @@ const emptyBooking = {
   notes: '',
   quotation_amount: 0,
   invoice_amount: 0,
-  paid_amount: 0
+  paid_amount: 0,
+  awb_number: ''
 };
 
 function dateOnly(value) {
@@ -180,6 +181,7 @@ export default function BookingForm({ initialData, owners = [], onSubmit, submit
         <Input label="Pickup city" value={form.pickup_city} error={errors.pickup_city} onChange={(e) => updateField('pickup_city', e.target.value)} />
         <Input label="Delivery city" value={form.delivery_city} error={errors.delivery_city} onChange={(e) => updateField('delivery_city', e.target.value)} />
         <Input label="Cargo type" value={form.cargo_type} error={errors.cargo_type} onChange={(e) => updateField('cargo_type', e.target.value)} />
+        <Input label="AWB number" value={form.awb_number} error={errors.awb_number} onChange={(e) => updateField('awb_number', e.target.value)} placeholder="e.g. AWB001" />
         <Select label="Assigned owner" value={form.assigned_owner_id} onChange={(e) => updateField('assigned_owner_id', e.target.value)}>
           <option value="">Unassigned</option>
           {owners.map((owner) => (

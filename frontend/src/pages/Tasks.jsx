@@ -51,6 +51,14 @@ export default function Tasks() {
     loadTasks();
   }, []);
 
+  useEffect(() => {
+    function refreshTasks() {
+      loadTasks();
+    }
+    window.addEventListener('orbem:refresh-tasks', refreshTasks);
+    return () => window.removeEventListener('orbem:refresh-tasks', refreshTasks);
+  }, []);
+
   async function createTask(event) {
     event.preventDefault();
     setSaving(true);

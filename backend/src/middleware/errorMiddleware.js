@@ -20,13 +20,18 @@ function getLogMessage(error) {
 
 function errorHandler(error, req, res, next) {
   const statusCode = error.statusCode || 500;
-  const message = statusCode === 500 ? 'Something went wrong. Please try again.' : error.message;
+  let message = statusCode === 500 ? 'Something went wrong. Please try again.' : error.message;
+
+  if (error.code === 'LIMIT_FILE_SIZE') {
+    message = 'File is too large. Maximum upload size is 10MB.';
+  }
 
   if (process.env.NODE_ENV !== 'test') {
     console.error(`[${new Date().toISOString()}]`, getLogMessage(error));
   }
 
   res.status(statusCode).json({
+    success: false,
     message,
     details: error.details || undefined
   });

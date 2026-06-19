@@ -129,11 +129,67 @@ const today = asyncHandler(async (req, res) => {
   });
 });
 
+const charts = asyncHandler(async (req, res) => {
+  // Monthly Bookings - current year
+  const monthlyBookings = await query(
+    `SELECT DATE_FORMAT(booking_date, '%Y-%m') AS month, COUNT(*) AS count
+     FROM bookings
+     WHERE YEAR(booking_date) = YEAR(CURDATE())
+     GROUP BY DATE_FORMAT(booking_date, '%Y-%m')
+     ORDER BY month ASC`
+  );
+
+  // Monthly Revenue - current year
+  const monthlyRevenue = await query(
+    `SELECT DATE_FORMAT(COALESCE(paid_at, payment_date), '%Y-%m') AS month, COALESCE(SUM(paid_amount), 0) AS amount
+     FROM payments
+     WHERE paid_amount > 0 AND (
+       (paid_at IS NOT NULL AND YEAR(paid_at) = YEAR(CURDATE()))
+       OR (paid_at IS NULL AND payment_date IS NOT NULL AND YEAR(payment_date) = YEAR(CURDATE()))
+     )
+     GROUP BY DATE_FORMAT(COALESCE(paid_at, payment_date), '%Y-%m')
+     ORDER BY month ASC`
+  );
+
+  // Shipment Status distribution
+  const shipmentStatus = await query(
+    `SELECT COALESCE(NULLIF(current_status, ''), 'Unknown') AS status, COUNT(*) AS count
+     FROM shipments
+     GROUP BY COALESCE(NULLIF(current_status, ''), 'Unknown')
+     ORDER BY count DESC`
+  );
+
+  // Document Status distribution
+  const documentStatus = await query(
+    `SELECT status, COUNT(*) AS count
+     FROM documents
+     GROUP BY status
+     ORDER BY count DESC`
+  );
+
+  // Payment Status distribution
+  const paymentStatus = await query(
+    `SELECT COALESCE(NULLIF(payment_status, ''), 'Unknown') AS status, COUNT(*) AS count
+     FROM payments
+     GROUP BY COALESCE(NULLIF(payment_status, ''), 'Unknown')
+     ORDER BY count DESC`
+  );
+
+  res.json({
+    monthlyBookings: safeRows(monthlyBookings),
+    monthlyRevenue: safeRows(monthlyRevenue),
+    shipmentStatus: safeRows(shipmentStatus),
+    documentStatus: safeRows(documentStatus),
+    paymentStatus: safeRows(paymentStatus)
+  });
+});
+
 module.exports = {
   summary,
   revenue,
   status,
   customerBusiness,
   delayedTrend,
-  today
+  today,
+  charts
 };

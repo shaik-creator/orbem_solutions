@@ -1,7 +1,8 @@
 require('dotenv').config();
 const http = require('http');
-const { Server } = require('socket.io');
+const socketHelper = require('./config/socket');
 const app = require('./app');
+const { testConnection } = require('./config/db');
 const { scheduleDailyAlerts } = require('./services/alertService');
 
 const port = Number(process.env.PORT || 5000);
@@ -12,18 +13,9 @@ const corsOrigins = [
   'http://127.0.0.1:5173'
 ];
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: corsOrigins,
-    credentials: true
-  }
-});
+const io = socketHelper.init(server, corsOrigins);
 
 app.set('io', io);
-
-io.on('connection', (socket) => {
-  socket.emit('connected', { message: 'Connected to ORBEM Operations API.' });
-});
 
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
@@ -36,5 +28,8 @@ server.on('error', (error) => {
 
 server.listen(port, () => {
   console.log(`ORBEM Operations API running on http://localhost:${port}`);
+  testConnection()
+    .then(() => console.log('MySQL database connected.'))
+    .catch((error) => console.error(error.message || 'MySQL connection failed. Check backend/.env database settings.'));
   scheduleDailyAlerts();
 });

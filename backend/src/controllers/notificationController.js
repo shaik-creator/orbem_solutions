@@ -3,6 +3,7 @@ const { asyncHandler } = require('../middleware/errorMiddleware');
 const { runAlertChecks } = require('../services/alertService');
 const { createHttpError } = require('../utils/validators');
 const { logActivity } = require('../services/activityService');
+const socketHelper = require('../config/socket');
 
 const listNotifications = asyncHandler(async (req, res) => {
   const rows = await query(
@@ -12,7 +13,7 @@ const listNotifications = asyncHandler(async (req, res) => {
      WHERE n.user_id IS NULL OR n.user_id = ?
      ORDER BY n.created_at DESC, n.id DESC
      LIMIT 100`,
-    [req.user.id]
+     [req.user.id]
   );
   res.json({ notifications: rows });
 });
@@ -23,6 +24,10 @@ const markRead = asyncHandler(async (req, res) => {
     [req.params.id, req.user.id]
   );
   if (!result.affectedRows) throw createHttpError('Notification not found.', 404);
+
+  socketHelper.emit('alerts:update', { id: req.params.id, action: 'read' });
+  socketHelper.emit('dashboard:update', { type: 'alerts' });
+
   res.json({ message: 'Notification marked as read.' });
 });
 
@@ -39,6 +44,10 @@ const dismissNotification = asyncHandler(async (req, res) => {
     relatedType: 'notification',
     relatedId: req.params.id
   });
+
+  socketHelper.emit('alerts:update', { id: req.params.id, action: 'dismiss' });
+  socketHelper.emit('dashboard:update', { type: 'alerts' });
+
   res.json({ message: 'Notification dismissed.' });
 });
 
@@ -66,11 +75,20 @@ const assignTaskFromNotification = asyncHandler(async (req, res) => {
     relatedType: 'task',
     relatedId: result.insertId
   });
+
+  socketHelper.emit('tasks:update', { id: result.insertId, action: 'create' });
+  socketHelper.emit('alerts:update', { id: req.params.id, action: 'task_assigned' });
+  socketHelper.emit('dashboard:update', { type: 'tasks' });
+
   res.status(201).json({ message: 'Task assigned from alert.', task: { id: result.insertId } });
 });
 
 const runAlerts = asyncHandler(async (req, res) => {
   const result = await runAlertChecks();
+
+  socketHelper.emit('alerts:update', { action: 'run_checks' });
+  socketHelper.emit('dashboard:update', { type: 'alerts' });
+
   res.json({
     message: `Alert check completed. ${result.createdCount} new notifications created.`,
     ...result

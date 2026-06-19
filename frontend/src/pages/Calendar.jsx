@@ -46,6 +46,14 @@ export default function Calendar() {
     loadEvents();
   }, []);
 
+  useEffect(() => {
+    function refreshCalendar() {
+      loadEvents(range);
+    }
+    window.addEventListener('orbem:refresh-calendar', refreshCalendar);
+    return () => window.removeEventListener('orbem:refresh-calendar', refreshCalendar);
+  }, [range]);
+
   const grouped = events.reduce((acc, event) => {
     const key = String(event.event_date || '').slice(0, 10);
     acc[key] = acc[key] || [];

@@ -2,6 +2,7 @@ const { query } = require('../config/db');
 const { asyncHandler } = require('../middleware/errorMiddleware');
 const { PRIORITIES, assertDate, assertIn, assertRequired, createHttpError } = require('../utils/validators');
 const { logActivity } = require('../services/activityService');
+const socketHelper = require('../config/socket');
 
 const TASK_STATUSES = ['To Do', 'In Progress', 'Waiting', 'Completed'];
 
@@ -56,6 +57,10 @@ const createTask = asyncHandler(async (req, res) => {
     relatedType: 'task',
     relatedId: result.insertId
   });
+
+  socketHelper.emit('tasks:update', { id: result.insertId, action: 'create' });
+  socketHelper.emit('dashboard:update', { type: 'tasks' });
+
   res.status(201).json({ message: 'Task created.', task: { id: result.insertId } });
 });
 
@@ -86,6 +91,10 @@ const updateTask = asyncHandler(async (req, res) => {
     relatedType: 'task',
     relatedId: req.params.id
   });
+
+  socketHelper.emit('tasks:update', { id: req.params.id, action: 'update' });
+  socketHelper.emit('dashboard:update', { type: 'tasks' });
+
   res.json({ message: 'Task updated.' });
 });
 
@@ -99,6 +108,10 @@ const deleteTask = asyncHandler(async (req, res) => {
     relatedType: 'task',
     relatedId: req.params.id
   });
+
+  socketHelper.emit('tasks:update', { id: req.params.id, action: 'delete' });
+  socketHelper.emit('dashboard:update', { type: 'tasks' });
+
   res.json({ message: 'Task deleted.' });
 });
 
@@ -115,6 +128,10 @@ const updateTaskStatus = asyncHandler(async (req, res) => {
     relatedType: 'task',
     relatedId: req.params.id
   });
+
+  socketHelper.emit('tasks:update', { id: req.params.id, action: 'status_update' });
+  socketHelper.emit('dashboard:update', { type: 'tasks' });
+
   res.json({ message: 'Task status updated.' });
 });
 

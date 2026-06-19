@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Columns3, Download, Filter, Plus, Search, Upload, X } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Columns3, Download, Filter, PackageCheck, Plus, Search, Trash2, Upload, UserCheck, X } from 'lucide-react';
 import api, { downloadFile, getErrorMessage } from '../services/api';
 import { bookingService } from '../services/bookingService';
 import BookingTable from '../components/bookings/BookingTable';
@@ -13,8 +13,30 @@ import LoadingState from '../components/common/LoadingState';
 import PageHeader from '../components/common/PageHeader';
 import Select from '../components/common/Select';
 import Toast from '../components/common/Toast';
+import { formatDate } from '../utils/formatters';
 
 const statuses = ['', 'Booked', 'Picked Up', 'In Warehouse', 'Documents Pending', 'Ready for Dispatch', 'In Transit', 'Customs Hold', 'Delivered', 'Delayed', 'Completed', 'Cancelled'];
+
+function csvCell(value) {
+  const text = value === undefined || value === null || value === '' ? '-' : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadCsv(filename, columns, rows) {
+  const csv = [
+    columns.map((column) => csvCell(column.label)).join(','),
+    ...rows.map((row) => columns.map((column) => csvCell(column.value(row))).join(','))
+  ].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
+}
 
 export default function Bookings() {
   const [searchParams] = useSearchParams();
@@ -22,6 +44,9 @@ export default function Bookings() {
   const isShipmentsPage = location.pathname === '/shipments';
   const [bookings, setBookings] = useState([]);
   const [owners, setOwners] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkOwnerId, setBulkOwnerId] = useState('');
+  const [bulkLoading, setBulkLoading] = useState('');
   const [selectedOriginLocation, setSelectedOriginLocation] = useState(null);
   const [selectedDestinationLocation, setSelectedDestinationLocation] = useState(null);
   const [filters, setFilters] = useState({
@@ -61,8 +86,39 @@ export default function Bookings() {
     loadBookings();
   }, []);
 
+  useEffect(() => {
+    function refreshBookings() {
+      loadBookings(filters);
+    }
+    window.addEventListener('orbem:refresh-bookings', refreshBookings);
+    return () => window.removeEventListener('orbem:refresh-bookings', refreshBookings);
+  }, [filters]);
+
   function updateFilter(field, value) {
     setFilters((current) => ({ ...current, [field]: value }));
+  }
+
+  function toggleRowSelection(id) {
+    setSelectedIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id]
+    );
+  }
+
+  function toggleAllVisible() {
+    const visibleIds = bookings.map((booking) => booking.id);
+    const visibleSet = new Set(visibleIds);
+    setSelectedIds((current) => {
+      const allSelected = visibleIds.length > 0 && visibleIds.every((id) => current.includes(id));
+      if (allSelected) return current.filter((id) => !visibleSet.has(id));
+      return Array.from(new Set([...current, ...visibleIds]));
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds([]);
+    setBulkOwnerId('');
   }
 
   function updateOrigin(value) {
@@ -91,6 +147,7 @@ export default function Bookings() {
     try {
       await bookingService.remove(deleteTarget.id);
       setBookings((current) => current.filter((row) => row.id !== deleteTarget.id));
+      setSelectedIds((current) => current.filter((id) => id !== deleteTarget.id));
       setToast(`Booking ${deleteTarget.booking_id} deleted.`);
       setDeleteTarget(null);
     } catch (err) {
@@ -104,8 +161,109 @@ export default function Bookings() {
     const reset = { q: '', status: '', origin: '', destination: '', owner: '', dateFrom: '', dateTo: '' };
     setSelectedOriginLocation(null);
     setSelectedDestinationLocation(null);
+    clearSelection();
     setFilters(reset);
     loadBookings(reset);
+  }
+
+  async function bulkUpdateStatus(status, displayLabel = status) {
+    if (!selectedIds.length) return;
+    setBulkLoading(`status:${status}`);
+    setError('');
+    try {
+      const ids = [...selectedIds];
+      await Promise.all(
+        ids.map((id) =>
+          bookingService.updateStatus(id, {
+            status,
+            location: 'Operations',
+            remarks: `Bulk update: ${displayLabel}.`
+          })
+        )
+      );
+      await loadBookings(filters);
+      clearSelection();
+      setToast(`${ids.length} ${isShipmentsPage ? 'shipments' : 'bookings'} marked ${displayLabel}.`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBulkLoading('');
+    }
+  }
+
+  async function bulkAssignOwner(ownerId = bulkOwnerId) {
+    if (!selectedIds.length) return;
+    if (!ownerId) {
+      setToast('Choose an owner before assigning selected rows.');
+      return;
+    }
+    setBulkLoading('owner');
+    setError('');
+    try {
+      const ids = [...selectedIds];
+      const owner = owners.find((item) => String(item.id) === String(ownerId));
+      await Promise.all(ids.map((id) => bookingService.update(id, { assigned_owner_id: Number(ownerId) })));
+      await loadBookings(filters);
+      clearSelection();
+      setToast(`${ids.length} ${isShipmentsPage ? 'shipments' : 'bookings'} assigned${owner ? ` to ${owner.name}` : ''}.`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBulkLoading('');
+    }
+  }
+
+  async function bulkDeleteSelected() {
+    if (!selectedIds.length) return;
+    const label = isShipmentsPage ? 'shipments' : 'bookings';
+    if (!window.confirm(`Are you sure you want to delete ${selectedIds.length} selected ${label}?`)) return;
+    setBulkLoading('delete');
+    setError('');
+    try {
+      const ids = [...selectedIds];
+      await Promise.all(ids.map((id) => bookingService.remove(id)));
+      await loadBookings(filters);
+      clearSelection();
+      setToast(`${ids.length} selected ${label} deleted.`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBulkLoading('');
+    }
+  }
+
+  function bulkExportSelected() {
+    const rows = bookings.filter((booking) => selectedIds.includes(booking.id));
+    if (!rows.length) {
+      setToast('Selected rows are not visible in the current filter.');
+      return;
+    }
+
+    if (isShipmentsPage) {
+      downloadCsv('selected-shipments.csv', [
+        { label: 'AWB number', value: (row) => row.awb_number || row.booking_id },
+        { label: 'Origin', value: (row) => row.origin_airport },
+        { label: 'Destination', value: (row) => row.destination_airport },
+        { label: 'Current status', value: (row) => row.shipment_status },
+        { label: 'Current location', value: (row) => row.pickup_city || row.origin_airport },
+        { label: 'Expected delivery', value: (row) => formatDate(row.expected_delivery_date) },
+        { label: 'Delayed status', value: (row) => (row.shipment_status === 'Delayed' ? 'Delayed' : 'On track') }
+      ], rows);
+      setToast(`${rows.length} selected shipments exported.`);
+      return;
+    }
+
+    downloadCsv('selected-bookings.csv', [
+      { label: 'Booking number', value: (row) => row.booking_id },
+      { label: 'AWB number', value: (row) => row.awb_number || row.booking_id },
+      { label: 'Customer', value: (row) => row.customer_name },
+      { label: 'Origin', value: (row) => row.origin_airport },
+      { label: 'Destination', value: (row) => row.destination_airport },
+      { label: 'Status', value: (row) => row.shipment_status },
+      { label: 'Owner', value: (row) => row.assigned_owner || 'Unassigned' },
+      { label: 'Date', value: (row) => formatDate(row.booking_date) }
+    ], rows);
+    setToast(`${rows.length} selected bookings exported.`);
   }
 
   const bookingStats = {
@@ -123,6 +281,10 @@ export default function Bookings() {
     ['Delayed', bookingStats.delayed, '#e24b4a'],
     ['Cleared', bookingStats.cleared, '#1d9e75']
   ];
+  const visibleIds = bookings.map((booking) => booking.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.includes(id)) && !allVisibleSelected;
+  const selectedLabel = isShipmentsPage ? 'shipments' : 'bookings';
 
   return (
     <div className="space-y-4 text-[13px]">
@@ -202,7 +364,50 @@ export default function Bookings() {
       </div>
 
       {error ? <ErrorState message={error} onRetry={() => loadBookings()} /> : null}
-      {loading ? <LoadingState rows={6} /> : <BookingTable bookings={bookings} onDelete={setDeleteTarget} />}
+      {selectedIds.length ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-3 py-2 shadow-sm">
+          <p className="mr-auto text-xs font-semibold text-[#1e3a8a]">{selectedIds.length} {selectedLabel} selected</p>
+          <Button variant="secondary" icon={X} className="min-h-8 px-3 py-1.5 text-xs" onClick={clearSelection}>Clear selection</Button>
+          {isShipmentsPage ? (
+            <>
+              <Button icon={PackageCheck} loading={bulkLoading === 'status:In Transit'} className="min-h-8 bg-[#0f1f3d] px-3 py-1.5 text-xs hover:bg-[#1a3258]" onClick={() => bulkUpdateStatus('In Transit')}>Mark In Transit</Button>
+              <Button icon={PackageCheck} loading={bulkLoading === 'status:Delayed'} className="min-h-8 bg-[#b42318] px-3 py-1.5 text-xs hover:bg-[#912018]" onClick={() => bulkUpdateStatus('Delayed')}>Mark Delayed</Button>
+              <Button icon={CheckCircle2} loading={bulkLoading === 'status:Delivered'} className="min-h-8 px-3 py-1.5 text-xs" onClick={() => bulkUpdateStatus('Delivered')}>Mark Delivered</Button>
+            </>
+          ) : (
+            <>
+              <Button icon={CheckCircle2} loading={bulkLoading === 'status:Booked'} className="min-h-8 bg-[#0f1f3d] px-3 py-1.5 text-xs hover:bg-[#1a3258]" onClick={() => bulkUpdateStatus('Booked', 'Submitted')}>Mark Submitted</Button>
+              <Button icon={CheckCircle2} loading={bulkLoading === 'status:Ready for Dispatch'} className="min-h-8 px-3 py-1.5 text-xs" onClick={() => bulkUpdateStatus('Ready for Dispatch', 'Confirmed')}>Mark Confirmed</Button>
+            </>
+          )}
+          <Select
+            aria-label={`Assign owner to selected ${selectedLabel}`}
+            className="w-48 text-xs"
+            value={bulkOwnerId}
+            onChange={(event) => setBulkOwnerId(event.target.value)}
+          >
+            <option value="">Assign owner...</option>
+            {owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name}</option>)}
+          </Select>
+          <Button variant="secondary" icon={UserCheck} loading={bulkLoading === 'owner'} className="min-h-8 px-3 py-1.5 text-xs" onClick={() => bulkAssignOwner()}>Assign Owner</Button>
+          <Button variant="secondary" icon={Download} className="min-h-8 px-3 py-1.5 text-xs" onClick={bulkExportSelected}>Export selected</Button>
+          <Button variant="danger" icon={Trash2} loading={bulkLoading === 'delete'} className="min-h-8 px-3 py-1.5 text-xs" onClick={bulkDeleteSelected}>Delete selected</Button>
+        </div>
+      ) : null}
+      {loading ? (
+        <LoadingState rows={6} />
+      ) : (
+        <BookingTable
+          bookings={bookings}
+          onDelete={setDeleteTarget}
+          selectedIds={selectedIds}
+          onToggleRowSelection={toggleRowSelection}
+          onToggleAllVisible={toggleAllVisible}
+          allVisibleSelected={allVisibleSelected}
+          someVisibleSelected={someVisibleSelected}
+          selectionType={isShipmentsPage ? 'shipment' : 'booking'}
+        />
+      )}
 
       <ConfirmModal
         open={Boolean(deleteTarget)}

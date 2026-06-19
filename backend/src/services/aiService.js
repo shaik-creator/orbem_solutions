@@ -3,7 +3,7 @@ const { query } = require('../config/db');
 const { getDashboardSummary, getBookingContext } = require('./dashboardSummaryService');
 
 function extractBookingId(message) {
-  const match = String(message || '').match(/ORB-\d{4}-\d{4}/i);
+  const match = String(message || '').match(/\b(ORB-\d{4}-\d{4}|ORB\d{3,}|AWB\d+)\b/i);
   return match ? match[0].toUpperCase() : null;
 }
 
@@ -31,7 +31,7 @@ async function callGrok(prompt) {
     const response = await axios.post(
       'https://api.x.ai/v1/chat/completions',
       {
-        model: process.env.GROK_MODEL || 'grok-4.3',
+        model: process.env.GROK_MODEL || 'grok-2-latest',
         temperature: 0.3,
         messages: [
           {
@@ -75,6 +75,31 @@ function ruleBasedResponse(message, context) {
     return 'Chargeable weight is the higher value between actual weight and volumetric weight. Volumetric weight = length x width x height x package count / 6000. Use the higher number for airline billing.';
   }
 
+  if (text.includes('revenue') || text.includes('sales')) {
+    return `Current month revenue is INR ${Number(kpis.monthlyRevenue || 0).toFixed(2)}. Total received revenue is INR ${Number(kpis.totalRevenue || 0).toFixed(2)}, pending payments are INR ${Number(kpis.pendingPayments || 0).toFixed(2)}, and ${kpis.overduePayments || 0} payment records are overdue.`;
+  }
+
+  if (text.includes('pending payment') || text.includes('overdue payment')) {
+    const rows = context.dashboard?.tables?.pendingPayments || [];
+    if (!rows.length) return 'No pending payment rows are visible for the current dashboard context.';
+    return `Pending payments total INR ${Number(kpis.pendingPayments || 0).toFixed(2)}. Start with ${rows
+      .slice(0, 3)
+      .map((row) => `${row.booking_id}: INR ${Number(row.balance_amount || 0).toFixed(2)} due ${row.due_date || 'soon'}`)
+      .join('; ')}.`;
+  }
+
+  if (text.includes('how many bookings') || text.includes('dashboard summary')) {
+    if (text.includes('month')) {
+      return `There are ${kpis.bookingsThisMonth || 0} bookings created this month. Current total bookings are ${kpis.totalBookings || 0}.`;
+    }
+    return `Current dashboard summary: ${kpis.totalBookings || 0} total bookings, ${kpis.activeShipments || 0} active shipments, ${kpis.completedShipments || 0} completed shipments, ${kpis.pendingDocuments || 0} bookings with pending documents, and ${kpis.delayedShipments || 0} delayed shipments.`;
+  }
+
+  if (text.includes('status of') && context.booking?.booking) {
+    const booking = context.booking.booking;
+    return `${booking.booking_id || booking.awb_number} is currently ${booking.shipment_status}. Route: ${booking.origin_airport || booking.origin} to ${booking.destination_airport || booking.destination}. Payment status: ${booking.payment_status || 'not recorded'}.`;
+  }
+
   if (text.includes('pending document') || text.includes('documents')) {
     const rows = context.dashboard?.tables?.pendingDocuments || [];
     if (!rows.length) return 'No pending document rows are visible for the current dashboard context.';
@@ -116,7 +141,7 @@ async function buildAssistantContext(message) {
   const dashboard = await getDashboardSummary({});
   const recentAlerts = await query(
     `SELECT title, message, type, severity, created_at
-     FROM notifications
+     FROM alerts
      ORDER BY created_at DESC, id DESC
      LIMIT 8`
   );
@@ -125,10 +150,15 @@ async function buildAssistantContext(message) {
     dashboard,
     databaseContext: {
       totalBookings: dashboard.kpis.totalBookings,
+      bookingsThisMonth: dashboard.kpis.bookingsThisMonth,
+      activeShipments: dashboard.kpis.activeShipments,
       completedShipments: dashboard.kpis.completedShipments,
       pendingDocuments: dashboard.kpis.pendingDocuments,
       delayedShipments: dashboard.kpis.delayedShipments,
+      monthlyRevenue: dashboard.kpis.monthlyRevenue,
       pendingPayments: dashboard.kpis.pendingPayments,
+      overduePayments: dashboard.kpis.overduePayments,
+      activeStaffToday: dashboard.kpis.activeStaffToday,
       recentAlerts
     }
   };
@@ -164,13 +194,8 @@ Answer with clear operations next steps.`;
     return { reply: grok.reply.trim(), provider: 'grok', context };
   }
 
-  const notice =
-    grok.unavailableReason === 'missing-key'
-      ? 'AI API key not configured. Using local assistant mode.'
-      : 'Grok is unavailable right now. Using local assistant mode.';
-
   return {
-    reply: `${notice}\n\n${ruleBasedResponse(message, context)}`,
+    reply: `Assistant is running in local mode.\n\n${ruleBasedResponse(message, context)}`,
     provider: 'rule-based',
     context
   };

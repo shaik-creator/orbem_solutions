@@ -1,5 +1,6 @@
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Check, Edit, Eye, Trash2 } from 'lucide-react';
+import { ArrowRight, Edit, Eye, Trash2 } from 'lucide-react';
 import Button from '../common/Button';
 import EmptyState from '../common/EmptyState';
 import StatusBadge from './StatusBadge';
@@ -12,7 +13,24 @@ function docsLabel(booking) {
   return { text: '0/4', tone: 'text-[#ef9f27]', done: false };
 }
 
-export default function BookingTable({ bookings, onDelete }) {
+export default function BookingTable({
+  bookings,
+  onDelete,
+  selectedIds = [],
+  onToggleRowSelection,
+  onToggleAllVisible,
+  allVisibleSelected = false,
+  someVisibleSelected = false,
+  selectionType = 'booking'
+}) {
+  const headerCheckboxRef = useRef(null);
+
+  useEffect(() => {
+    if (headerCheckboxRef.current) {
+      headerCheckboxRef.current.indeterminate = someVisibleSelected;
+    }
+  }, [someVisibleSelected]);
+
   if (!bookings.length) {
     return <EmptyState title="No bookings found" message="Bookings matching the current filters will appear here." />;
   }
@@ -24,9 +42,18 @@ export default function BookingTable({ bookings, onDelete }) {
           <thead className="bg-[#f8fafc] text-left text-[11px] font-semibold uppercase tracking-[0.03em] text-[#64748b]">
             <tr>
               <th className="w-9 px-3 py-2">
-                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border border-[#0f1f3d] bg-[#0f1f3d] text-white">
-                  <Check className="h-2.5 w-2.5" />
-                </span>
+                <input
+                  ref={headerCheckboxRef}
+                  type="checkbox"
+                  className="h-3.5 w-3.5 rounded-[3px] border-[#0f1f3d] text-[#0f1f3d] focus:ring-[#0f1f3d]"
+                  checked={allVisibleSelected}
+                  onChange={(event) => {
+                    event.stopPropagation();
+                    onToggleAllVisible?.();
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                  aria-label={`Select all visible ${selectionType === 'shipment' ? 'shipments' : 'bookings'}`}
+                />
               </th>
               <th className="px-3 py-2">AWB / Route</th>
               <th className="px-3 py-2">Customer</th>
@@ -40,14 +67,27 @@ export default function BookingTable({ bookings, onDelete }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#edf2f7]">
-            {bookings.map((booking, index) => {
+            {bookings.map((booking) => {
               const docs = docsLabel(booking);
+              const isSelected = selectedIds.includes(booking.id);
+              const selectionLabel =
+                selectionType === 'shipment'
+                  ? `Select shipment AWB ${booking.awb_number || booking.booking_id}`
+                  : `Select booking ${booking.booking_id}`;
               return (
-              <tr key={booking.id} className="transition hover:bg-[#f8fafc]">
-                <td className="px-3 py-2">
-                  <span className={classNames('flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border', index === 0 ? 'border-[#0f1f3d] bg-[#0f1f3d] text-white' : 'border-[#cbd5e1] bg-white text-transparent')}>
-                    <Check className="h-2.5 w-2.5" />
-                  </span>
+              <tr key={booking.id} className={classNames('transition hover:bg-[#f8fafc]', isSelected ? 'bg-[#eff6ff]' : '')}>
+                <td className={classNames('px-3 py-2', isSelected ? 'shadow-[inset_3px_0_0_#2563eb]' : '')}>
+                  <input
+                    type="checkbox"
+                    className="h-3.5 w-3.5 rounded-[3px] border-[#cbd5e1] text-[#0f1f3d] focus:ring-[#0f1f3d]"
+                    checked={isSelected}
+                    onChange={(event) => {
+                      event.stopPropagation();
+                      onToggleRowSelection?.(booking.id);
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label={selectionLabel}
+                  />
                 </td>
                 <td className="px-3 py-2">
                   <Link to={`/bookings/${booking.id}`} className="orbem-mono text-[11px] font-bold text-[#0f1f3d] hover:text-[#1d9e75]">

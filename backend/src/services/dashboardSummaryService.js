@@ -57,6 +57,18 @@ async function getDashboardSummary(filters = {}) {
   const paymentJoin = `FROM bookings b LEFT JOIN payments p ON p.booking_id = b.id ${filter.sql}`;
 
   const bookingsCount = firstRow(await query(`SELECT COUNT(DISTINCT b.id) AS booking_count ${paymentJoin}`, filter.params));
+  const bookingsThisMonth = firstRow(await query(
+    `SELECT COUNT(*) AS bookings_this_month
+     FROM bookings
+     WHERE YEAR(booking_date) = YEAR(CURDATE()) AND MONTH(booking_date) = MONTH(CURDATE())`
+  ));
+  const activeCount = firstRow(await query(
+    `SELECT COUNT(DISTINCT b.id) AS active_count
+     FROM bookings b
+     LEFT JOIN payments p ON p.booking_id = b.id
+     ${filter.sql ? `${filter.sql} AND` : 'WHERE'} b.shipment_status NOT IN ('Delivered','Completed','Cancelled')`,
+    filter.params
+  ));
   const completedCount = firstRow(await query(
     `SELECT COUNT(DISTINCT b.id) AS completed_count
      FROM bookings b
@@ -86,6 +98,31 @@ async function getDashboardSummary(filters = {}) {
             COALESCE(SUM(CASE WHEN p.balance_amount > 0 THEN p.balance_amount ELSE 0 END), 0) AS pending_payment_amount
      ${paymentJoin}`,
     filter.params
+  ));
+
+  const monthlyRevenue = firstRow(await query(
+    `SELECT COALESCE(SUM(p.paid_amount), 0) AS monthly_revenue
+     FROM payments p
+     WHERE p.paid_amount > 0
+       AND (
+         (p.paid_at IS NOT NULL AND YEAR(p.paid_at) = YEAR(CURDATE()) AND MONTH(p.paid_at) = MONTH(CURDATE()))
+         OR (p.paid_at IS NULL AND p.payment_date IS NOT NULL AND YEAR(p.payment_date) = YEAR(CURDATE()) AND MONTH(p.payment_date) = MONTH(CURDATE()))
+       )`
+  ));
+
+  const overduePayments = firstRow(await query(
+    `SELECT COUNT(*) AS overdue_payment_count
+     FROM payments
+     WHERE balance_amount > 0
+       AND (payment_status = 'Overdue' OR (due_date IS NOT NULL AND due_date < CURDATE() AND payment_status <> 'Paid'))`
+  ));
+
+  const unreadAlerts = firstRow(await query('SELECT COUNT(*) AS unread_alert_count FROM alerts WHERE is_read = 0'));
+
+  const activeStaffToday = firstRow(await query(
+    `SELECT COUNT(DISTINCT user_id) AS active_staff_today
+     FROM staff_activity
+     WHERE user_id IS NOT NULL AND DATE(created_at) = CURDATE()`
   ));
 
   const customers = firstRow(await query(
@@ -150,11 +187,17 @@ async function getDashboardSummary(filters = {}) {
   return {
     kpis: {
       totalBookings: toNumber(bookingsCount.booking_count),
+      bookingsThisMonth: toNumber(bookingsThisMonth.bookings_this_month),
+      activeShipments: toNumber(activeCount.active_count),
       completedShipments: toNumber(completedCount.completed_count),
       pendingDocuments: toNumber(pendingDocuments.pending_document_count),
       delayedShipments: toNumber(delayed.delayed_count),
       totalRevenue: toNumber(revenue.total_revenue),
       pendingPayments: toNumber(revenue.pending_payment_amount),
+      monthlyRevenue: toNumber(monthlyRevenue.monthly_revenue),
+      overduePayments: toNumber(overduePayments.overdue_payment_count),
+      unreadAlerts: toNumber(unreadAlerts.unread_alert_count),
+      activeStaffToday: toNumber(activeStaffToday.active_staff_today),
       activeCustomers: toNumber(customers.customer_count),
       openComplaints: toNumber(complaints.open_complaint_count)
     },
@@ -174,9 +217,9 @@ async function getBookingContext(identifier) {
      FROM bookings b
      LEFT JOIN users u ON u.id = b.assigned_owner_id
      LEFT JOIN payments p ON p.booking_id = b.id
-     WHERE b.booking_id = ? OR b.id = ?
+     WHERE b.booking_id = ? OR b.id = ? OR b.awb_number = ?
      LIMIT 1`,
-    [identifier, Number(identifier) || 0]
+    [identifier, Number(identifier) || 0, identifier]
   );
 
   if (!rows.length) return null;

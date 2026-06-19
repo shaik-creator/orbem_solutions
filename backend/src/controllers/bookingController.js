@@ -15,6 +15,7 @@ const {
   createHttpError
 } = require('../utils/validators');
 const { logActivity } = require('../services/activityService');
+const socketHelper = require('../config/socket');
 
 const BOOKING_FIELDS = [
   'customer_name',
@@ -38,7 +39,8 @@ const BOOKING_FIELDS = [
   'actual_delivery_date',
   'assigned_owner_id',
   'priority',
-  'notes'
+  'notes',
+  'awb_number'
 ];
 
 function validateBookingPayload(body, partial = false) {
@@ -97,6 +99,7 @@ function normalizeBooking(body, existing = {}) {
   payload.priority = payload.priority || 'Normal';
   payload.assigned_owner_id = payload.assigned_owner_id || null;
   payload.actual_delivery_date = payload.actual_delivery_date || null;
+  payload.awb_number = payload.awb_number || null;
 
   const weights = calculateChargeableWeight(payload);
   payload.volumetric_weight = weights.volumetric_weight;
@@ -250,8 +253,8 @@ const createBooking = asyncHandler(async (req, res) => {
         origin_airport, destination_airport, pickup_city, delivery_city, cargo_type, cargo_description,
         package_count, actual_weight, length_cm, width_cm, height_cm, volumetric_weight, chargeable_weight,
         shipment_status, booking_date, expected_delivery_date, actual_delivery_date, assigned_owner_id,
-        priority, notes, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        priority, notes, created_by, awb_number)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         bookingCode,
         customerId,
@@ -279,7 +282,23 @@ const createBooking = asyncHandler(async (req, res) => {
         payload.assigned_owner_id,
         payload.priority,
         payload.notes || null,
-        req.user.id
+        req.user.id,
+        payload.awb_number || bookingCode
+      ]
+    );
+
+    // Create corresponding shipment record in shipments table
+    await connection.query(
+      `INSERT INTO shipments (booking_id, awb_number, origin, destination, current_status, expected_delivery_date, current_location)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        result.insertId,
+        payload.awb_number || bookingCode,
+        payload.origin_airport,
+        payload.destination_airport,
+        payload.shipment_status,
+        payload.expected_delivery_date,
+        payload.pickup_city
       ]
     );
 
@@ -318,7 +337,11 @@ const createBooking = asyncHandler(async (req, res) => {
     relatedId: created.id
   });
 
-  res.status(201).json({ message: 'Booking created successfully.', booking: created });
+  socketHelper.emit('bookings:update', { id: created.id, action: 'create' });
+  socketHelper.emit('dashboard:update', { type: 'bookings' });
+
+  const rows = await query('SELECT * FROM bookings WHERE id = ? LIMIT 1', [created.id]);
+  res.status(201).json({ message: 'Booking created successfully.', booking: rows[0] || created });
 });
 
 const updateBooking = asyncHandler(async (req, res) => {
@@ -334,7 +357,7 @@ const updateBooking = asyncHandler(async (req, res) => {
       cargo_type = ?, cargo_description = ?, package_count = ?, actual_weight = ?,
       length_cm = ?, width_cm = ?, height_cm = ?, volumetric_weight = ?, chargeable_weight = ?,
       shipment_status = ?, booking_date = ?, expected_delivery_date = ?, actual_delivery_date = ?,
-      assigned_owner_id = ?, priority = ?, notes = ?
+      assigned_owner_id = ?, priority = ?, notes = ?, awb_number = ?
      WHERE id = ?`,
     [
       payload.customer_name,
@@ -361,9 +384,42 @@ const updateBooking = asyncHandler(async (req, res) => {
       payload.assigned_owner_id,
       payload.priority,
       payload.notes || null,
+      payload.awb_number || null,
       req.params.id
     ]
   );
+
+  // Sync corresponding record in shipments table
+  const existingShipment = await query('SELECT id FROM shipments WHERE booking_id = ? LIMIT 1', [req.params.id]);
+  if (existingShipment.length) {
+    await query(
+      `UPDATE shipments SET
+        awb_number = ?, origin = ?, destination = ?, current_status = ?, expected_delivery_date = ?
+       WHERE booking_id = ?`,
+      [
+        payload.awb_number || null,
+        payload.origin_airport || null,
+        payload.destination_airport || null,
+        payload.shipment_status || 'Pending',
+        payload.expected_delivery_date || null,
+        req.params.id
+      ]
+    );
+  } else {
+    await query(
+      `INSERT INTO shipments (booking_id, awb_number, origin, destination, current_status, expected_delivery_date, current_location)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        req.params.id,
+        payload.awb_number || null,
+        payload.origin_airport,
+        payload.destination_airport,
+        payload.shipment_status,
+        payload.expected_delivery_date,
+        payload.pickup_city
+      ]
+    );
+  }
 
   await logActivity({
     userId: req.user.id,
@@ -374,7 +430,11 @@ const updateBooking = asyncHandler(async (req, res) => {
     relatedId: req.params.id
   });
 
-  res.json({ message: 'Booking updated successfully.' });
+  socketHelper.emit('bookings:update', { id: req.params.id, action: 'update' });
+  socketHelper.emit('dashboard:update', { type: 'bookings' });
+
+  const updated = await query('SELECT * FROM bookings WHERE id = ? LIMIT 1', [req.params.id]);
+  res.json({ message: 'Booking updated successfully.', booking: updated[0] });
 });
 
 const deleteBooking = asyncHandler(async (req, res) => {
@@ -388,6 +448,10 @@ const deleteBooking = asyncHandler(async (req, res) => {
     relatedType: 'booking',
     relatedId: req.params.id
   });
+
+  socketHelper.emit('bookings:update', { id: req.params.id, action: 'delete' });
+  socketHelper.emit('dashboard:update', { type: 'bookings' });
+
   res.json({ message: 'Booking deleted successfully.' });
 });
 
@@ -406,6 +470,13 @@ const updateStatus = asyncHandler(async (req, res) => {
   );
   if (!result.affectedRows) throw createHttpError('Booking not found.', 404);
 
+  // Sync with shipments table
+  const isDelayed = status === 'Delayed' ? 1 : 0;
+  await query(
+    'UPDATE shipments SET current_status = ?, is_delayed = ? WHERE booking_id = ?',
+    [status, isDelayed, req.params.id]
+  );
+
   await query(
     `INSERT INTO shipment_milestones (booking_id, status, location, remarks, created_by)
      VALUES (?, ?, ?, ?, ?)`,
@@ -421,7 +492,11 @@ const updateStatus = asyncHandler(async (req, res) => {
     relatedId: req.params.id
   });
 
-  res.json({ message: 'Shipment status updated successfully.' });
+  socketHelper.emit('bookings:update', { id: req.params.id, action: 'status_update' });
+  socketHelper.emit('dashboard:update', { type: 'bookings' });
+
+  const updated = await query('SELECT * FROM bookings WHERE id = ? LIMIT 1', [req.params.id]);
+  res.json({ message: 'Shipment status updated successfully.', booking: updated[0] });
 });
 
 const getTimeline = asyncHandler(async (req, res) => {

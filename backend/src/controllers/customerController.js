@@ -101,7 +101,8 @@ const createCustomer = asyncHandler(async (req, res) => {
     relatedType: 'customer',
     relatedId: result.insertId
   });
-  res.status(201).json({ message: 'Customer created.', customer: { id: result.insertId } });
+  const rows = await query('SELECT * FROM customers WHERE id = ? LIMIT 1', [result.insertId]);
+  res.status(201).json({ message: 'Customer created.', customer: rows[0] });
 });
 
 const updateCustomer = asyncHandler(async (req, res) => {
@@ -130,7 +131,8 @@ const updateCustomer = asyncHandler(async (req, res) => {
     relatedType: 'customer',
     relatedId: req.params.id
   });
-  res.json({ message: 'Customer updated.' });
+  const updated = await query('SELECT * FROM customers WHERE id = ? LIMIT 1', [req.params.id]);
+  res.json({ message: 'Customer updated.', customer: updated[0] });
 });
 
 const deleteCustomer = asyncHandler(async (req, res) => {
