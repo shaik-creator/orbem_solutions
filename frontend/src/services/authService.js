@@ -1,5 +1,5 @@
 import { createContext, createElement, useContext, useEffect, useMemo, useState } from 'react';
-import api from './api';
+import api, { AUTH_SESSION_INVALIDATED_EVENT } from './api';
 
 const AuthContext = createContext(null);
 
@@ -16,6 +16,10 @@ export function getToken() {
 }
 
 function persistSession(payload) {
+  if (!payload?.token || !payload?.user) {
+    throw new Error('The server returned an invalid authentication response.');
+  }
+
   localStorage.setItem('orbem_token', payload.token);
   localStorage.setItem('orbem_user', JSON.stringify(payload.user));
 }
@@ -26,38 +30,69 @@ export function clearSession() {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(getStoredUser());
-  const [loading, setLoading] = useState(Boolean(getToken()));
+  const [token, setToken] = useState(getToken);
+  const [user, setUser] = useState(() => (getToken() ? getStoredUser() : null));
+  const [loading, setLoading] = useState(() => Boolean(getToken()));
 
   useEffect(() => {
     let mounted = true;
+
+    function endSession() {
+      clearSession();
+      if (!mounted) return;
+      setToken(null);
+      setUser(null);
+      setLoading(false);
+    }
+
+    function syncSessionFromStorage(event) {
+      if (event.key && !['orbem_token', 'orbem_user'].includes(event.key)) return;
+
+      const nextToken = getToken();
+      setToken(nextToken);
+      setUser(nextToken ? getStoredUser() : null);
+      setLoading(false);
+    }
+
+    window.addEventListener(AUTH_SESSION_INVALIDATED_EVENT, endSession);
+    window.addEventListener('storage', syncSessionFromStorage);
+
     async function refreshUser() {
       if (!getToken()) {
+        clearSession();
+        setToken(null);
+        setUser(null);
         setLoading(false);
         return;
       }
+
       try {
         const response = await api.get('/api/auth/me');
         if (mounted) {
+          setToken(getToken());
           setUser(response.data.user);
           localStorage.setItem('orbem_user', JSON.stringify(response.data.user));
         }
       } catch {
-        clearSession();
-        if (mounted) setUser(null);
+        endSession();
       } finally {
         if (mounted) setLoading(false);
       }
     }
+
     refreshUser();
+
     return () => {
       mounted = false;
+      window.removeEventListener(AUTH_SESSION_INVALIDATED_EVENT, endSession);
+      window.removeEventListener('storage', syncSessionFromStorage);
     };
   }, []);
 
   async function login(credentials) {
     const response = await api.post('/api/auth/login', credentials);
     persistSession(response.data);
+    setToken(response.data.token);
     setUser(response.data.user);
     return response.data.user;
   }
@@ -65,12 +100,14 @@ export function AuthProvider({ children }) {
   async function register(payload) {
     const response = await api.post('/api/auth/register', payload);
     persistSession(response.data);
+    setToken(response.data.token);
     setUser(response.data.user);
     return response.data.user;
   }
 
   function logout() {
     clearSession();
+    setToken(null);
     setUser(null);
   }
 
@@ -88,9 +125,9 @@ export function AuthProvider({ children }) {
       register,
       updateUser,
       logout,
-      isAuthenticated: Boolean(user && getToken())
+      isAuthenticated: Boolean(user && token)
     }),
-    [user, loading]
+    [user, token, loading]
   );
 
   return createElement(AuthContext.Provider, { value }, children);

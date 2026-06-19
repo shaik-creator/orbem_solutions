@@ -26,7 +26,13 @@ async function protect(req, res, next) {
     next();
   } catch (error) {
     error.statusCode = error.statusCode || 401;
-    error.message = error.message === 'jwt expired' ? 'Session expired. Please login again.' : error.message;
+
+    if (error.name === 'TokenExpiredError') {
+      error.message = 'Session expired. Please login again.';
+    } else if (error.name === 'JsonWebTokenError' || error.name === 'NotBeforeError') {
+      error.message = 'Session is invalid. Please login again.';
+    }
+
     next(error);
   }
 }

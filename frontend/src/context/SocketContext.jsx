@@ -1,20 +1,27 @@
-import { createContext, useContext, useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../services/api';
+import { useAuth } from '../services/authService';
 
 const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
-  const socketRef = useRef(null);
+  const { isAuthenticated } = useAuth();
+  const [activeSocket, setActiveSocket] = useState(null);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setActiveSocket(null);
+      return undefined;
+    }
+
     // Connect to the Socket.IO server
     const socket = io(API_BASE_URL, {
       withCredentials: true,
       transports: ['websocket', 'polling']
     });
 
-    socketRef.current = socket;
+    setActiveSocket(socket);
 
     socket.on('connect', () => {
       console.log('Socket.IO connected to backend:', API_BASE_URL);
@@ -58,14 +65,13 @@ export function SocketProvider({ children }) {
     });
 
     return () => {
-      if (socket) {
-        socket.disconnect();
-      }
+      socket.disconnect();
+      setActiveSocket(null);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   return (
-    <SocketContext.Provider value={socketRef.current}>
+    <SocketContext.Provider value={activeSocket}>
       {children}
     </SocketContext.Provider>
   );

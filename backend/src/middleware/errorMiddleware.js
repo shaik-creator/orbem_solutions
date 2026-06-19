@@ -26,7 +26,8 @@ function errorHandler(error, req, res, next) {
     message = 'File is too large. Maximum upload size is 10MB.';
   }
 
-  if (process.env.NODE_ENV !== 'test') {
+  const shouldLog = statusCode >= 500 || process.env.LOG_CLIENT_ERRORS === 'true';
+  if (process.env.NODE_ENV !== 'test' && shouldLog) {
     console.error(`[${new Date().toISOString()}]`, getLogMessage(error));
   }
 
